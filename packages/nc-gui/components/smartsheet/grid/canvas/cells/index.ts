@@ -26,6 +26,7 @@ import { JsonCellRenderer } from './Json'
 import { BarcodeCellRenderer } from './Barcode'
 import { QRCodeCellRenderer } from './QRCode'
 import { RatingCellRenderer } from './Rating'
+import { ColourCellRenderer } from './Colour'
 import { UserFieldCellRenderer } from './User'
 import { SingleSelectCellRenderer } from './SingleSelect'
 import { MultiSelectCellRenderer } from './MultiSelect'
@@ -35,6 +36,7 @@ import { LookupCellRenderer } from './Lookup'
 import { ButtonCellRenderer } from './Button'
 import { LtarCellRenderer } from './LTAR'
 import { FormulaCellRenderer } from './Formula'
+import { UUIDCellRenderer } from './UUID'
 import { GenericReadOnlyRenderer } from './GenericReadonlyRenderer'
 import { NullCellRenderer } from './Null'
 import { PlainCellRenderer } from './Plain'
@@ -123,6 +125,7 @@ export function useGridCellHandler(params: {
   cellTypesRegistry.set(UITypes.Barcode, BarcodeCellRenderer)
   cellTypesRegistry.set(UITypes.QrCode, QRCodeCellRenderer)
   cellTypesRegistry.set(UITypes.Rating, RatingCellRenderer)
+  cellTypesRegistry.set(UITypes.Colour, ColourCellRenderer)
   cellTypesRegistry.set(UITypes.User, UserFieldCellRenderer)
   cellTypesRegistry.set(UITypes.CreatedBy, UserFieldCellRenderer)
   cellTypesRegistry.set(UITypes.LastModifiedBy, UserFieldCellRenderer)
@@ -136,6 +139,7 @@ export function useGridCellHandler(params: {
   cellTypesRegistry.set(UITypes.Formula, FormulaCellRenderer)
   cellTypesRegistry.set(UITypes.Geometry, SingleLineTextCellRenderer)
   cellTypesRegistry.set(UITypes.SpecificDBType, SingleLineTextCellRenderer)
+  cellTypesRegistry.set(UITypes.UUID, UUIDCellRenderer)
   cellTypesRegistry.set(UITypes.ForeignKey, GenericReadOnlyRenderer)
   cellTypesRegistry.set(UITypes.ID, GenericReadOnlyRenderer)
 

@@ -185,6 +185,7 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
   public model: Model;
   public context: NcContext;
   public schema?: string;
+  public formulaDryRunFailed?: boolean;
 
   public static config: any = defaultLimitConfig;
 
@@ -304,7 +305,10 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
           query?.[QUERY_STRING_FIELD_ID_ON_RESULT] === 'true',
       });
     } catch (e) {
+      const isTransient = isTransientError(e);
+
       if (
+        isTransient ||
         validateFormula ||
         !haveFormulaColumn(await this.model.getColumns(this.context))
       )
@@ -453,7 +457,10 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
     try {
       data = await this.execAndParse(qb, null, { first: true });
     } catch (e) {
-      if (validateFormula || !haveFormulaColumn(columns)) throw e;
+      const isTransient = isTransientError(e);
+
+      if (isTransient || validateFormula || !haveFormulaColumn(columns))
+        throw e;
       logger.log(e);
       return this.findOne(args, true);
     }
