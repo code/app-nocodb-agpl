@@ -13629,7 +13629,9 @@
               "User",
               "CreatedBy",
               "LastModifiedBy",
-              "Meta"
+              "Meta",
+              "Colour",
+              "UUID"
             ],
             "type": "string"
           },
@@ -15987,7 +15989,7 @@
                 },
                 {
                   "id": "sl_ihyva6jx6dg0fc",
-                  "fk_column_id": "cl_g0a89q9xdry3lu",
+                  "fk_column_id": "cl_ga89q9xdry3lu",
                   "title": "a",
                   "color": "#cfdffe",
                   "order": 1,
@@ -16550,7 +16552,9 @@
           "GeoData",
           "Geometry",
           "JSON",
-          "SpecificDBType"
+          "SpecificDBType",
+          "Colour",
+          "UUID"
         ],
         "type": "string"
       },

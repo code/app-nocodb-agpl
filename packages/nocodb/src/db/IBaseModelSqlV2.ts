@@ -404,4 +404,11 @@ export interface IBaseModelSqlV2 {
     isPg: boolean;
     isMySQL: boolean;
   };
+
+  /**
+   * Set to true when a formula dry-run fails during validateFormula.
+   * Subsequent dry-runs on the same instance short-circuit immediately
+   * to avoid amplifying requests to an overwhelmed external source.
+   */
+  formulaDryRunFailed?: boolean;
 }
