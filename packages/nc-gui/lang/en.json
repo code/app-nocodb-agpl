@@ -1844,7 +1844,9 @@
     "recordSelected": "record selected",
     "recordsSelected": "records selected",
     "saveChanges": "Save changes",
-    "publishing": "Publishing"
+    "publishing": "Publishing",
+    "navigate": "Navigate",
+    "select": "Select"
   },
   "activity": {
     "clickToResolve": "Click to resolve",
