@@ -1920,7 +1920,11 @@ export function useCanvasRender({
 
       roundedRect(ctx, 0, warningRow.yOffset + rowHeight.value, 90, 25, { bottomRight: 6 }, { backgroundColor: orange })
       renderSingleLineText(ctx, {
-        text: warningRow.row.rowMeta.isValidationFailed ? 'Row filtered' : 'Row moved',
+        text: warningRow.row.rowMeta.isValidationFailed
+          ? 'Row filtered'
+          : warningRow.row.rowMeta.isRlsHidden
+          ? 'Row hidden'
+          : 'Row moved',
         x: 10,
         y: warningRow.yOffset + rowHeight.value,
         py: 7,
@@ -2723,7 +2727,11 @@ export function useCanvasRender({
 
       roundedRect(ctx, gXOffset, warningRow.yOffset + rowHeight.value, 90, 25, { bottomRight: 6 }, { backgroundColor: orange })
       renderSingleLineText(ctx, {
-        text: warningRow.row.rowMeta.isValidationFailed ? 'Row filtered' : 'Row moved',
+        text: warningRow.row.rowMeta.isValidationFailed
+          ? 'Row filtered'
+          : warningRow.row.rowMeta.isRlsHidden
+          ? 'Row hidden'
+          : 'Row moved',
         x: 10 + gXOffset,
         y: warningRow.yOffset + rowHeight.value,
         py: 7,
