@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { type TableType, type ViewType, PlanFeatureTypes, ViewTypes, viewTypeAlias } from 'nocodb-sdk'
+import { type TableType, type ViewType, ViewTypes, viewTypeAlias } from 'nocodb-sdk'
 
 const { isMobileMode } = useGlobal()
 
@@ -266,7 +266,6 @@ async function onOpenModal({
                   <div class="nc-viewlist-submenu-popup-item">
                     <GeneralViewIcon :meta="{ type: ViewTypes.MAP }" />
                     {{ $t('objects.viewType.map') }}
-                    <EePaymentUpgradeBadge v-if="blockMapView" :feature="PlanFeatureTypes.FEATURE_MAP_VIEW" class="ml-auto" />
                   </div>
                 </a-menu-item>
 
