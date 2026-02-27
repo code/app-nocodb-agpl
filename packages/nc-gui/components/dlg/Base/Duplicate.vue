@@ -15,10 +15,6 @@ const { navigateToProject, user } = useGlobal()
 
 const { refreshCommandPalette } = useCommandPalette()
 
-const { isDashboardEnabled } = storeToRefs(useDashboardStore())
-
-const { isWorkflowsEnabled } = storeToRefs(useWorkflowStore())
-
 const { api } = useApi()
 
 const { $e, $poller } = useNuxtApp()
@@ -28,6 +24,8 @@ const basesStore = useBases()
 const { workspacesList, activeWorkspace } = useWorkspace()
 
 const { loadProjects, createProject: _createProject } = basesStore
+
+const wsBaseListActions = useWsBaseListActions()
 
 // Check if current user is base owner
 const isBaseOwner = computed(() => {
@@ -39,11 +37,11 @@ const options = ref({
   includeViews: true,
   includeHooks: true,
   includeComments: true,
-  includeScripts: true,
-  includeDashboards: isDashboardEnabled.value,
-  includeWorkflows: isWorkflowsEnabled.value,
+  includeScripts: isEeUI,
+  includeDashboards: isEeUI,
+  includeWorkflows: isEeUI,
 })
-const targetWorkspace = ref(activeWorkspace)
+const targetWorkspace = ref(workspacesList.find((ws) => ws.id === props.base.fk_workspace_id) ?? activeWorkspace)
 
 const errorMessage = ref()
 
@@ -132,7 +130,7 @@ const _duplicate = async () => {
             status.value = 'error'
             errorMessage.value = data?.data?.error?.message || 'Some error occurred'
             try {
-              await loadProjects('workspace')
+              await loadProjects('workspace', targetWorkspace?.value?.id ?? props.base.fk_workspace_id)
             } catch (_e: any) {
               // ignore
             }
@@ -170,6 +168,10 @@ const handleActionClick = () => {
       break
     }
     case 'success': {
+      if (wsBaseListActions) {
+        wsBaseListActions.closeModal()
+      }
+
       const base = targetBase.value
       navigateToProject({
         workspaceId: isEeUI ? base.fk_workspace_id : undefined,
@@ -277,7 +279,7 @@ onKeyStroke('Enter', () => {
           </div>
 
           <div
-            v-if="isDashboardEnabled && isEeUI"
+            v-if="isEeUI"
             class="flex gap-3 cursor-pointer leading-5 text-nc-content-gray font-medium items-center"
             @click="options.includeDashboards = !options.includeDashboards"
           >
@@ -286,7 +288,7 @@ onKeyStroke('Enter', () => {
           </div>
 
           <div
-            v-if="isWorkflowsEnabled && isEeUI"
+            v-if="isEeUI"
             class="flex gap-3 cursor-pointer leading-5 text-nc-content-gray font-medium items-center"
             @click="options.includeWorkflows = !options.includeWorkflows"
           >

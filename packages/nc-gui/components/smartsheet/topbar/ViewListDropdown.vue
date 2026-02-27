@@ -13,7 +13,7 @@ const { activeTable } = storeToRefs(useTablesStore())
 
 const viewsStore = useViewsStore()
 
-const { activeView, views } = storeToRefs(viewsStore)
+const { activeView, views, isListViewEnabled } = storeToRefs(viewsStore)
 
 const { navigateToView, onOpenViewCreateModal } = viewsStore
 
@@ -21,13 +21,15 @@ const { isAiFeaturesEnabled } = useNocoAi()
 
 const isOpen = ref<boolean>(false)
 
+const activeSource = computed(() => {
+  return base.value.sources?.find((s) => s.id === activeView.value?.source_id)
+})
+
 const isSqlView = computed(() => (activeTable.value as TableType)?.type === 'view')
 
 const isSyncedTable = computed(() => (activeTable.value as TableType)?.synced)
 
-const activeSource = computed(() => {
-  return base.value.sources?.find((s) => s.id === activeView.value?.source_id)
-})
+const isPgSource = computed(() => activeSource.value?.type === 'pg')
 
 /**
  * Handles navigation to a selected view.
@@ -238,6 +240,20 @@ async function onOpenModal({
                     {{ $t('objects.viewType.calendar') }}
                   </div>
                 </a-menu-item>
+                <template v-if="isListViewEnabled">
+                  <NcTooltip :title="$t('tooltip.listViewOnlyPg')" :disabled="isPgSource" placement="right">
+                    <a-menu-item
+                      :disabled="!isPgSource"
+                      data-testid="topbar-view-create-list"
+                      @click="isPgSource && onOpenModal({ type: ViewTypes.LIST })"
+                    >
+                      <div class="nc-viewlist-submenu-popup-item" :class="{ 'opacity-50': !isPgSource }">
+                        <GeneralViewIcon :meta="{ type: ViewTypes.LIST }" />
+                        {{ $t('objects.viewType.list') }}
+                      </div>
+                    </a-menu-item>
+                  </NcTooltip>
+                </template>
 
                 <template v-if="isAiFeaturesEnabled">
                   <NcDivider />

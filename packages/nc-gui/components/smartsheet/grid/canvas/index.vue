@@ -250,8 +250,10 @@ const { height: windowHeight, width: windowWidth } = useWindowSize()
 const { aggregations, loadViewAggregate } = useViewAggregateOrThrow()
 const { isDataReadOnly, isUIAllowed, isMetaReadOnly } = useRoles()
 const { isMobileMode, isAddNewRecordGridMode, setAddNewRecordGridMode, appInfo } = useGlobal()
+const { selectedTemplate } = useRecordTemplate()
+const { base } = storeToRefs(useBase())
 const route = useRoute()
-const { $e } = useNuxtApp()
+const { $e, $api } = useNuxtApp()
 const { t } = useI18n()
 const tooltipStore = useTooltipStore()
 const { targetReference, placement } = storeToRefs(tooltipStore)
@@ -742,6 +744,36 @@ function onNewRecordToFormClick(path: Array<number> = []) {
   openNewRecordFormHook.trigger({ overwrite, path })
   openAddNewRowDropdown.value = null
   isDropdownVisible.value = false
+}
+
+function onOpenTemplateManager() {
+  openAddNewRowDropdown.value = null
+  isDropdownVisible.value = false
+  const { openManager } = useRecordTemplate()
+  openManager()
+}
+
+/** Create a record using the currently selected template (delegates to shared utility) */
+async function onSelectedTemplateClick() {
+  const tmpl = selectedTemplate.value
+  if (!tmpl || !base.value?.id || !meta.value?.id) return
+
+  try {
+    await createRecordFromTemplate({
+      tmpl,
+      api: $api,
+      baseId: base.value.id,
+      tableId: meta.value.id,
+      columns: (meta.value.columns || []) as ColumnType[],
+      getMeta,
+    })
+
+    message.toast('Record created from template')
+    reloadViewDataHook?.trigger()
+  } catch (e: any) {
+    console.error(e)
+    message.toast(await extractSdkResponseErrorMsg(e))
+  }
 }
 
 const onVisibilityChange = (value: boolean) => {
@@ -1572,7 +1604,9 @@ async function handleMouseUp(e: MouseEvent, _elementMap: CanvasElement) {
 
         const setGroup = getDefaultGroupData(group)
 
-        if (isAddNewRecordGridMode.value || !isGroupBy.value) {
+        if (selectedTemplate.value) {
+          onSelectedTemplateClick()
+        } else if (isAddNewRecordGridMode.value || !isGroupBy.value) {
           addEmptyRow(undefined, undefined, undefined, setGroup, groupPath)
         } else {
           openNewRecordHandler({ overwrite: setGroup, path: groupPath })
@@ -1580,7 +1614,11 @@ async function handleMouseUp(e: MouseEvent, _elementMap: CanvasElement) {
       } else {
         if (removeInlineAddRecord.value) return
 
-        await addEmptyRow()
+        if (selectedTemplate.value) {
+          await onSelectedTemplateClick()
+        } else {
+          await addEmptyRow()
+        }
       }
     }
     selection.value.clear()
@@ -2436,6 +2474,14 @@ const bulkUpdataContext = (path: Array<number>) => {
   emits('bulkUpdateDlg', path)
 }
 
+const showSendRecordModal = ref(false)
+const sendRecordRowId = ref<string | null>(null)
+
+const handleSendRecord = (rowId: string) => {
+  sendRecordRowId.value = rowId
+  showSendRecordModal.value = true
+}
+
 watch([height, width, windowWidth, windowHeight], () => {
   nextTick(() => {
     calculateSlices()
@@ -2590,7 +2636,7 @@ onClickOutside(
       isExpandedCellInputExist() ||
       isLinkDropdownExist() ||
       isGeneralOverlayActive() ||
-      (element && hasAncestorWithClass(element, ['ant-select-dropdown', 'nc-dropdown']))
+      (element && hasAncestorWithClass(element, ['ant-select-dropdown', 'nc-dropdown', 'nc-colour-picker-modal']))
     ) {
       return
     }
@@ -2877,6 +2923,7 @@ watch(
               :clear-selected-range-of-cells="clearSelectedRangeOfCells"
               @click="isContextMenuOpen = false"
               @bulk-update-dlg="bulkUpdataContext"
+              @send-record="handleSendRecord"
             />
           </template>
         </NcDropdown>
@@ -3004,6 +3051,7 @@ watch(
             :path="openAddNewRowDropdown"
             :on-new-record-to-grid-click="onNewRecordToGridClick"
             :on-new-record-to-form-click="onNewRecordToFormClick"
+            :on-open-template-manager="onOpenTemplateManager"
           />
           <GroupContextMenu
             v-else-if="openGroupContextMenuDropdown"
@@ -3072,7 +3120,13 @@ watch(
               </NcButton>
               <NcButton
                 v-else
-                v-e="[isAddNewRecordGridMode && !isGroupBy ? 'c:row:add:grid' : 'c:row:add:form']"
+                v-e="[
+                  selectedTemplate
+                    ? 'c:row:add:template'
+                    : isAddNewRecordGridMode && !isGroupBy
+                    ? 'c:row:add:grid'
+                    : 'c:row:add:form',
+                ]"
                 class="nc-grid-add-new-row"
                 size="small"
                 :class="{
@@ -3080,11 +3134,20 @@ watch(
                 }"
                 type="secondary"
                 :shadow="false"
-                @click.stop="isAddNewRecordGridMode && !isGroupBy ? addEmptyRow() : onNewRecordToFormClick()"
+                @click.stop="
+                  selectedTemplate
+                    ? onSelectedTemplateClick()
+                    : isAddNewRecordGridMode && !isGroupBy
+                    ? addEmptyRow()
+                    : onNewRecordToFormClick()
+                "
               >
                 <div data-testid="nc-pagination-add-record" class="flex items-center gap-2">
                   <GeneralIcon icon="plus" />
-                  <template v-if="isAddNewRecordGridMode || isGroupBy">
+                  <template v-if="selectedTemplate">
+                    {{ selectedTemplate.title }}
+                  </template>
+                  <template v-else-if="isAddNewRecordGridMode || isGroupBy">
                     {{ $t('activity.newRecord') }}
                   </template>
                   <template v-else> {{ $t('activity.newRecord') }} - {{ $t('objects.viewType.form') }}</template>
@@ -3106,6 +3169,7 @@ watch(
                 :path="openAddNewRowDropdown"
                 :on-new-record-to-grid-click="onNewRecordToGridClick"
                 :on-new-record-to-form-click="onNewRecordToFormClick"
+                :on-open-template-manager="onOpenTemplateManager"
               />
             </template>
           </NcDropdown>
@@ -3113,6 +3177,8 @@ watch(
       </PermissionsTooltip>
     </div>
   </div>
+
+  <DlgSendRecordEmail v-model="showSendRecordModal" :meta="meta" :view="view" :row-id="sendRecordRowId" />
 </template>
 
 <style scoped lang="scss">

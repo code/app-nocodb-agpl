@@ -37,6 +37,8 @@ export type InternalGETResponseType = Promise<
   | OAuthClient[]
   | Extension
   | Extension[]
+  | { workspaces: any[] }
+  | { totalRows: number; counts: Record<string, number> }
 >;
 
 export type InternalPOSTResponseType = Promise<

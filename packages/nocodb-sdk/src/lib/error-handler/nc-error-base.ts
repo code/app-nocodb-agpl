@@ -98,6 +98,13 @@ export class NcErrorBase {
     });
   }
 
+  viewSectionNotFound(id: string, args?: NcErrorArgs): never {
+    throw this.errorCodex.generateError(NcErrorType.ERR_VIEW_SECTION_NOT_FOUND, {
+      params: id,
+      ...args,
+    });
+  }
+
   apiClientNotFound(id: string, args?: NcErrorArgs): never {
     throw this.errorCodex.generateError(NcErrorType.ERR_API_CLIENT_NOT_FOUND, {
       params: id,
@@ -363,6 +370,16 @@ export class NcErrorBase {
       params: message,
       ...args,
     });
+  }
+
+  insufficientPrivilege(message: string, args?: NcErrorArgs): never {
+    throw this.errorCodex.generateError(
+      NcErrorType.ERR_INSUFFICIENT_PRIVILEGE,
+      {
+        params: message,
+        ...args,
+      }
+    );
   }
 
   sourceDataReadOnly(name: string) {

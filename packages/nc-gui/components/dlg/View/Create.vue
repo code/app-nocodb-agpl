@@ -171,6 +171,7 @@ const typeAlias = computed(
       [ViewTypes.KANBAN]: 'kanban',
       [ViewTypes.MAP]: 'map',
       [ViewTypes.CALENDAR]: 'calendar',
+      [ViewTypes.LIST]: 'list',
       // Todo: add ai view docs route
       AI: '',
     }[props.type]),
@@ -838,6 +839,14 @@ watch(activeBaseId, () => {
             </template>
             <template v-else>
               {{ $t(`labels.${getPluralName('createCalendarView')}`) }}
+            </template>
+          </template>
+          <template v-else-if="form.type === ViewTypes.LIST">
+            <template v-if="form.copy_from_id">
+              {{ $t('labels.duplicateListView') }}
+            </template>
+            <template v-else>
+              {{ $t(`labels.${getPluralName('createListView')}`) }}
             </template>
           </template>
           <template v-else-if="form.type === 'AI'">

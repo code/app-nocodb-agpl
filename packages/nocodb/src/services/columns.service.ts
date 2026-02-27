@@ -10,9 +10,11 @@ import {
   isCreatedOrLastModifiedByCol,
   isCreatedOrLastModifiedTimeCol,
   isLinksOrLTAR,
+  isMMOrMMLike,
   isServiceUser,
   isSystemColumn,
   isVirtualCol,
+  LinksVersion,
   LongTextAiMetaProp,
   MetaEventType,
   NcApiVersion,
@@ -65,6 +67,7 @@ import {
   deleteColumnSystemPropsFromRequest,
   generateFkName,
   getMMColumnNames,
+  getRevType,
   sanitizeColumnName,
   validateLookupPayload,
   validatePayload,
@@ -450,9 +453,7 @@ export class ColumnsService implements IColumnsService {
     const isSyncedColumn = table.synced && column.readonly;
 
     if (context.schema_locked) {
-      NcError.get(context).schemaLocked(
-        'Schema modifications are not allowed on installed sandbox bases',
-      );
+      NcError.get(context).schemaLocked();
     }
 
     const source = await reuseOrSave('source', reuse, async () =>
@@ -658,8 +659,12 @@ export class ColumnsService implements IColumnsService {
       // Check if disabling unique constraint (always allowed)
       if (!param.column.unique && column.unique) {
         // Disabling is allowed, no validation needed
+      }
+      // if previous and existing are unique, no need to validate
+      else if (param.column.unique && column.unique) {
+        // no validation needed
       } else if (param.column.unique) {
-        // Enabling or keeping unique constraint enabled
+        // Enabling unique constraint enabled
         validateUniqueConstraint(
           context,
           (param.column.uidt || column.uidt) as UITypes,
@@ -688,11 +693,17 @@ export class ColumnsService implements IColumnsService {
     }
 
     // Check if default value is being set when unique constraint is enabled
+    // Exclude UUID fields which are allowed to have both unique constraint and auto-generation
+    // Also check the original column type to handle cases where uidt might not be sent in the update request
+    const isUUIDColumn =
+      (param.column.uidt || column.uidt) === UITypes.UUID ||
+      column.uidt === UITypes.UUID;
     if (
       'cdf' in param.column &&
       param.column.cdf !== null &&
       param.column.cdf !== undefined &&
-      param.column.cdf !== ''
+      param.column.cdf !== '' &&
+      !isUUIDColumn
     ) {
       const currentUnique =
         param.column.unique !== undefined ? param.column.unique : column.unique;
@@ -1059,6 +1070,14 @@ export class ColumnsService implements IColumnsService {
         );
       }
       colBody = await getColumnPropsFromUIDT(colBody, source);
+
+      // Preserve existing colOptions when the request doesn't include them.
+      // Without this, a metadata-only PATCH (e.g. updating description) would
+      // skip the options-processing block entirely or cause options to be wiped
+      // when Column.update deletes and re-inserts colOptions.
+      if (!colBody.colOptions?.options && column.colOptions?.options) {
+        colBody.colOptions = column.colOptions;
+      }
 
       const baseModel = await reuseOrSave('baseModel', reuse, async () =>
         Model.getBaseModelSQL(context, {
@@ -2179,7 +2198,16 @@ export class ColumnsService implements IColumnsService {
         }
       }
 
+      const originalCdf = colBody.cdf;
       colBody = await getColumnPropsFromUIDT(colBody, source);
+
+      if (
+        typeof colBody.cdf !== 'undefined' &&
+        typeof originalCdf === 'undefined'
+      ) {
+        // do not override cdf when request is undefined
+        colBody.cdf = originalCdf;
+      }
 
       await this.updateMetaAndDatabase(context, {
         table,
@@ -2475,9 +2503,7 @@ export class ColumnsService implements IColumnsService {
     );
 
     if (context.schema_locked) {
-      NcError.get(context).schemaLocked(
-        'Schema modifications are not allowed on installed sandbox bases',
-      );
+      NcError.get(context).schemaLocked();
     }
 
     const source = await reuseOrSave('source', reuse, async () =>
@@ -2627,11 +2653,13 @@ export class ColumnsService implements IColumnsService {
     }
 
     // Check if default value is being set when unique constraint is enabled
+    // Exclude UUID fields which are allowed to have both unique constraint and auto-generation
     if (
       originalCdf !== null &&
       originalCdf !== undefined &&
       originalCdf !== '' &&
-      colBody.unique
+      colBody.unique &&
+      colBody.uidt !== UITypes.UUID
     ) {
       NcError.get(context).badRequest(
         'Default values are not allowed for unique fields. Please disable the unique constraint first.',
@@ -2703,6 +2731,68 @@ export class ColumnsService implements IColumnsService {
           ...colBody,
           fk_model_id: table.id,
         });
+        break;
+      case UITypes.UUID:
+        {
+          // UUID is only supported for PostgreSQL databases
+          if (source.type !== 'pg') {
+            NcError.get(context).badRequest(
+              'UUID field type is supported only for PostgreSQL databases',
+            );
+          }
+
+          // Get column properties from UI type (sets dt='uuid', cdf='gen_random_uuid()')
+          colBody = await getColumnPropsFromUIDT(colBody, source);
+
+          // UUID fields must have unique constraint (per PRD requirement DR-2)
+          colBody.unique = true;
+
+          // Generate column ID upfront for unique constraint name
+          const columnId = await ncMeta.genNanoid(MetaTable.COLUMNS);
+          (colBody as any).base_id = context.base_id;
+          (colBody as any).fk_model_id = table.id;
+          (colBody as any).id = columnId;
+
+          // Generate unique constraint name and store in internal_meta
+          const internalMeta = this.storeUniqueConstraintNameInInternalMeta(
+            context,
+            {
+              base_id: context.base_id,
+              fk_model_id: table.id,
+              id: columnId,
+            },
+          );
+          colBody.internal_meta = internalMeta;
+
+          // Create the physical column in the database
+          const tableUpdateBody = {
+            ...table,
+            tn: table.table_name,
+            originalColumns: table.columns.map((c) => ({
+              ...c,
+              cn: c.column_name,
+            })),
+            columns: [
+              ...table.columns.map((c) => ({ ...c, cn: c.column_name })),
+              {
+                ...colBody,
+                cn: colBody.column_name,
+                altered: Altered.NEW_COLUMN,
+              },
+            ],
+          };
+
+          const sqlMgr = await reuseOrSave('sqlMgr', reuse, async () =>
+            ProjectMgrv2.getSqlMgr(context, { id: source.base_id }),
+          );
+          await sqlMgr.sqlOpPlus(source, 'tableUpdate', tableUpdateBody);
+
+          // Save the column metadata
+          savedColumn = await Column.insert(context, {
+            ...colBody,
+            fk_model_id: table.id,
+          });
+        }
         break;
       case UITypes.Formula:
         try {
@@ -3369,9 +3459,7 @@ export class ColumnsService implements IColumnsService {
     );
 
     if (context.schema_locked) {
-      NcError.get(context).schemaLocked(
-        'Schema modifications are not allowed on installed sandbox bases',
-      );
+      NcError.get(context).schemaLocked();
     }
 
     // check if source is readonly and column type is not allowed
@@ -3474,6 +3562,8 @@ export class ColumnsService implements IColumnsService {
       case UITypes.QrCode:
       case UITypes.Barcode:
       case UITypes.Button:
+        // PR review fix #3: UUID removed from this group — it has a physical DB column
+        // and must go through the default path (sqlOpPlus + tableUpdate) to drop it.
         await Column.delete2(
           context,
           {
@@ -3567,7 +3657,11 @@ export class ColumnsService implements IColumnsService {
           );
           const custom = column.meta?.custom;
 
-          switch (relationColOpt.type) {
+          const isMMLike = isMMOrMMLike(column);
+
+          const relationType = isMMLike ? 'mm' : relationColOpt.type;
+
+          switch (relationType) {
             case 'bt':
             case 'hm':
               {
@@ -3683,7 +3777,7 @@ export class ColumnsService implements IColumnsService {
                       ncMeta,
                     );
                   if (
-                    colOpt.type === 'mm' &&
+                    isMMOrMMLike(c) &&
                     colOpt.fk_parent_column_id === childColumn.id &&
                     colOpt.fk_child_column_id === parentColumn.id &&
                     colOpt.fk_mm_model_id === relationColOpt.fk_mm_model_id &&
@@ -4507,6 +4601,14 @@ export class ColumnsService implements IColumnsService {
 
     const reuse = param.reuse ?? {};
 
+    // v2 LTAR uses junction table for all relation types (like mm)
+    // v1 is the default - v2 is only used when explicitly requested via version param
+    const isMMLike =
+      (param.column as any).version === LinksVersion.V2 ||
+      // traditional MM is always treated as MM-like regardless of version
+      (param.column as LinkToAnotherColumnReqType).type ===
+        RelationTypes.MANY_TO_MANY;
+
     // get table and refTable models
     const table = await Model.getWithInfo(context, {
       id: (param.column as LinkToAnotherColumnReqType).parentId,
@@ -4572,8 +4674,9 @@ export class ColumnsService implements IColumnsService {
     }
 
     if (
-      (param.column as LinkToAnotherColumnReqType).type === 'hm' ||
-      (param.column as LinkToAnotherColumnReqType).type === 'bt'
+      !isMMLike &&
+      ((param.column as LinkToAnotherColumnReqType).type === 'hm' ||
+        (param.column as LinkToAnotherColumnReqType).type === 'bt')
     ) {
       // populate fk column name
       const fkColName = getUniqueColumnName(
@@ -4682,7 +4785,10 @@ export class ColumnsService implements IColumnsService {
         undefined,
         param.columnWebhookManager,
       );
-    } else if ((param.column as LinkToAnotherColumnReqType).type === 'oo') {
+    } else if (
+      !isMMLike &&
+      (param.column as LinkToAnotherColumnReqType).type === 'oo'
+    ) {
       // populate fk column name
       const fkColName = getUniqueColumnName(
         await refTable.getColumns(refContext),
@@ -4789,7 +4895,10 @@ export class ColumnsService implements IColumnsService {
         undefined,
         param.columnWebhookManager,
       );
-    } else if ((param.column as LinkToAnotherColumnReqType).type === 'mm') {
+    } else if (
+      isMMLike ||
+      (param.column as LinkToAnotherColumnReqType).type === 'mm'
+    ) {
       const aTn = await getJunctionTableName(param, table, refTable);
       const aTnAlias = aTn;
 
@@ -4885,6 +4994,7 @@ export class ColumnsService implements IColumnsService {
         await sqlMgr.sqlOpPlus(param.source, 'relationCreate', rel1Args);
         await sqlMgr.sqlOpPlus(param.source, 'relationCreate', rel2Args);
       }
+
       const parentCol = (await assocModel.getColumns(context))?.find(
         (c) => c.column_name === columnName,
       );
@@ -4892,6 +5002,7 @@ export class ColumnsService implements IColumnsService {
         (c) => c.column_name === refColumnName,
       );
 
+      // todo: skip hm and bt if new type
       await createHmAndBtColumn(
         context,
         param.req,
@@ -4962,14 +5073,44 @@ export class ColumnsService implements IColumnsService {
         };
       }
 
+      // Normalize V1 types to V2 equivalents when using junction table
+      // HM with junction table is effectively OM, BT with junction table is effectively MO
+      let normalizedType = (
+        param.column as Pick<LinkToAnotherColumnReqType, 'type'>
+      ).type as RelationTypes;
+      if (isMMLike) {
+        if (normalizedType === RelationTypes.HAS_MANY) {
+          normalizedType = RelationTypes.ONE_TO_MANY;
+        } else if (normalizedType === RelationTypes.BELONGS_TO) {
+          normalizedType = RelationTypes.MANY_TO_ONE;
+        }
+      }
+
+      const revType = getRevType(normalizedType);
+      const relationType = normalizedType;
+
+      // Use singular for ONE_TO_ONE and MANY_TO_ONE, plural for others
+      const defaultTitle = [
+        RelationTypes.ONE_TO_ONE,
+        RelationTypes.MANY_TO_ONE,
+      ].includes(relationType)
+        ? singularize(refTable.title)
+        : pluralize(refTable.title);
+
       savedColumn = await Column.insert(context, {
         title: getUniqueColumnAliasName(
           await table.getColumns(context),
-          param.column.title ?? pluralize(refTable.title),
+          param.column.title ?? defaultTitle,
         ),
 
-        uidt: isLinks ? UITypes.Links : UITypes.LinkToAnotherRecord,
-        type: 'mm',
+        // OO always uses LinkToAnotherRecord (same as V1 createOOColumn)
+        uidt:
+          relationType === RelationTypes.ONE_TO_ONE
+            ? UITypes.LinkToAnotherRecord
+            : isLinks
+            ? UITypes.Links
+            : UITypes.LinkToAnotherRecord,
+        type: relationType,
 
         fk_model_id: table.id,
 
@@ -4989,12 +5130,20 @@ export class ColumnsService implements IColumnsService {
           singular:
             param.column['meta']?.singular || singularize(refTable.title),
         },
-
+        version: isMMLike ? 2 : 1,
         // column_order and view_id if provided
         ...param.colExtra,
         // include cross base link props
         ...crossBaseLinkProps,
       });
+
+      // Use singular for ONE_TO_ONE and MANY_TO_ONE, plural for others
+      const reverseDefaultTitle = [
+        RelationTypes.ONE_TO_ONE,
+        RelationTypes.MANY_TO_ONE,
+      ].includes(revType)
+        ? singularize(table.title)
+        : pluralize(table.title);
 
       const parentRelCol = await Column.insert(refContext, {
         title: getUniqueColumnAliasName(
@@ -5003,10 +5152,17 @@ export class ColumnsService implements IColumnsService {
             // if self ref include saved column
             ...(table.id === refTable.id ? [savedColumn] : []),
           ],
-          pluralize(table.title),
+          reverseDefaultTitle,
         ),
-        uidt: isLinks ? UITypes.Links : UITypes.LinkToAnotherRecord,
-        type: 'mm',
+        // OO always uses LinkToAnotherRecord (same as V1 createOOColumn)
+        uidt:
+          revType === RelationTypes.ONE_TO_ONE
+            ? UITypes.LinkToAnotherRecord
+            : isLinks
+            ? UITypes.Links
+            : UITypes.LinkToAnotherRecord,
+        type: revType,
+        version: isMMLike ? 2 : 1,
 
         // ref_db_alias
         fk_model_id: refTable.id,

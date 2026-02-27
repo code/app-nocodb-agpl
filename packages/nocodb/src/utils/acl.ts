@@ -46,6 +46,7 @@ const permissionScopes = {
 
     // Misc
     'commandPalette',
+    'baseListAll',
     'testConnection',
     'genericGPT',
     'duplicateSharedBase',
@@ -95,6 +96,7 @@ const permissionScopes = {
     'dataExist',
     'dataFindOne',
     'dataGroupBy',
+    'dataExport',
     'exportCsv',
     'exportExcel',
     'sortList',
@@ -106,11 +108,10 @@ const permissionScopes = {
     'gridViewUpdate',
     'formViewUpdate',
     'formColumnUpdate',
-    // missing earlier confirm w/ Raju
-    // 'galleryViewUpdate',
-    // 'kanbanViewUpdate',
-    // 'mapViewUpdate',
-    // 'calendarViewUpdate',
+    'galleryViewUpdate',
+    'kanbanViewUpdate',
+    'mapViewUpdate',
+    'calendarViewUpdate',
     'calendarViewGet',
     'groupedDataList',
     'mmList',
@@ -153,6 +154,8 @@ const permissionScopes = {
     'filterDelete',
     'filterGet',
     'filterChildrenList',
+    'buttonFilterList',
+    'buttonFilterCreate',
     'mmExcludedList',
     'hmExcludedList',
     'btExcludedList',
@@ -206,6 +209,9 @@ const permissionScopes = {
     'mcpCreate',
     'mcpUpdate',
     'mcpDelete',
+
+    // etc
+    'fetchViaUrl',
   ],
 };
 
@@ -234,6 +240,7 @@ const rolePermissions:
       dataFindOne: true,
       dataGroupBy: true,
 
+      dataExport: true,
       exportCsv: true,
       exportExcel: true,
 
@@ -333,6 +340,28 @@ const rolePermissions:
 
       // Extensions
       extensionUpdate: true,
+
+      // etc
+      fetchViaUrl: true,
+
+      // Sort/Filter/ViewColumn/View operations for personal views (middleware handles ownership check)
+      sortCreate: true,
+      sortUpdate: true,
+      sortDelete: true,
+      filterCreate: true,
+      filterUpdate: true,
+      filterDelete: true,
+      buttonFilterList: true,
+      buttonFilterCreate: true,
+      viewColumnUpdate: true,
+      hideAllColumns: true,
+      showAllColumns: true,
+      gridColumnUpdate: true,
+      gridViewUpdate: true,
+      galleryViewUpdate: true,
+      kanbanViewUpdate: true,
+      mapViewUpdate: true,
+      calendarViewUpdate: true,
     },
   },
   [ProjectRoles.CREATOR]: {
@@ -360,6 +389,7 @@ const rolePermissions:
       testConnection: true,
       isPluginActive: true,
       commandPalette: true,
+      baseListAll: true,
       notification: true,
 
       // oAuth
@@ -395,6 +425,8 @@ const rolePermissions:
       integrationDelete: true,
       integrationUpdate: true,
       integrationList: true,
+      integrationStore: true,
+      integrationEndpointGet: true,
     },
   },
 };
@@ -607,6 +639,7 @@ const permissionDescriptions: Record<string, string> = {
 
   apiTokenList: 'view list of API tokens',
   apiTokenCreate: 'create a new API token',
+
   apiTokenDelete: 'delete an API token',
 
   passwordChange: 'change your password',
@@ -621,6 +654,7 @@ const permissionDescriptions: Record<string, string> = {
   pluginUpdate: 'update plugin configuration',
 
   commandPalette: 'access the command palette',
+  baseListAll: 'list all workspaces and bases',
   testConnection: 'test connection to a service',
   genericGPT: 'use generic GPT functionality',
 
@@ -701,6 +735,8 @@ const permissionDescriptions: Record<string, string> = {
   filterDelete: 'delete a filter',
   filterGet: 'view filter details',
   filterChildrenList: 'view child filters',
+  buttonFilterList: 'list button visibility filters',
+  buttonFilterCreate: 'create a button visibility filter',
   mmExcludedList: 'view excluded many-to-many relationships',
   hmExcludedList: 'view excluded hierarchical relationships',
   btExcludedList: 'view excluded relationships',

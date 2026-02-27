@@ -23,6 +23,7 @@ import type {
   GridViewUpdateEvent,
   IntegrationUpdateEvent,
   KanbanViewUpdateEvent,
+  ListViewUpdateEvent,
   MetaDiffEvent,
   OrgUserInviteEvent,
   PluginEvent,
@@ -333,7 +334,8 @@ export class AppHooksService {
       | AppEvents.CALENDAR_CREATE
       | AppEvents.GALLERY_CREATE
       | AppEvents.KANBAN_CREATE
-      | AppEvents.MAP_CREATE,
+      | AppEvents.MAP_CREATE
+      | AppEvents.LIST_CREATE,
     data: ViewCreateEvent,
   ): void;
   emit(
@@ -343,7 +345,8 @@ export class AppHooksService {
       | AppEvents.CALENDAR_DELETE
       | AppEvents.GALLERY_DELETE
       | AppEvents.KANBAN_DELETE
-      | AppEvents.MAP_DELETE,
+      | AppEvents.MAP_DELETE
+      | AppEvents.LIST_DELETE,
     data: ViewDeleteEvent,
   ): void;
   emit(
@@ -352,14 +355,16 @@ export class AppHooksService {
       | AppEvents.CALENDAR_UPDATE
       | AppEvents.GALLERY_UPDATE
       | AppEvents.KANBAN_UPDATE
-      | AppEvents.MAP_UPDATE,
+      | AppEvents.MAP_UPDATE
+      | AppEvents.LIST_UPDATE,
     data:
       | ViewUpdateEvent
       | GridViewUpdateEvent
       | GalleryViewUpdateEvent
       | KanbanViewUpdateEvent
       | CalendarViewUpdateEvent
-      | FormViewUpdateEvent,
+      | FormViewUpdateEvent
+      | ListViewUpdateEvent,
   ): void;
   emit(
     event:
@@ -404,15 +409,26 @@ export class AppHooksService {
       | AppEvents.CALENDAR_UPDATE
       | AppEvents.GALLERY_UPDATE
       | AppEvents.KANBAN_UPDATE
-      | AppEvents.MAP_UPDATE,
+      | AppEvents.MAP_UPDATE
+      | AppEvents.LIST_UPDATE,
     data:
       | ViewUpdateEvent
       | GridViewUpdateEvent
       | GalleryViewUpdateEvent
       | KanbanViewUpdateEvent
       | CalendarViewUpdateEvent
-      | FormViewUpdateEvent,
+      | FormViewUpdateEvent
+      | ListViewUpdateEvent,
   ): void;
+  emit(
+    event:
+      | AppEvents.RECORD_TEMPLATE_CREATE
+      | AppEvents.RECORD_TEMPLATE_UPDATE
+      | AppEvents.RECORD_TEMPLATE_DELETE
+      | AppEvents.RECORD_TEMPLATE_USE,
+    data: any,
+  ): void;
+
   emit(event, data): void {
     this.eventEmitter.emit(event, data);
     this.eventEmitter.emit(ALL_EVENTS, { event, data: data });

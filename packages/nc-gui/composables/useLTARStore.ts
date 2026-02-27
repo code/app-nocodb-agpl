@@ -6,6 +6,7 @@ import {
   dateFormats,
   hideExtraFieldsMetaKey,
   isDateOrDateTimeCol,
+  isLinkV2,
   isLinksOrLTAR,
   isNumericCol,
   isSystemColumn,
@@ -41,7 +42,7 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
     }
 
     // state
-    const { getMeta, getMetaByKey } = useMetas()
+    const { getMeta, getMetaByKey, getPartialMeta, metas } = useMetas()
 
     const { base, sqlUis } = storeToRefs(useBase())
 
@@ -116,6 +117,16 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
 
     const colOptions = computed(() => column.value?.colOptions as LinkToAnotherRecordType)
 
+    const type = computed(() => (isLinkV2(column.value) ? 'ln' : (colOptions.value?.type as RelationTypes)))
+
+    const isSingleTargetRelation = computed(() => {
+      return (
+        colOptions.value?.type === RelationTypes.MANY_TO_ONE ||
+        colOptions.value?.type === RelationTypes.BELONGS_TO ||
+        colOptions.value?.type === RelationTypes.ONE_TO_ONE
+      )
+    })
+
     const { sharedView } = useSharedView()
 
     const { getViewColumns } = useSmartsheetStoreOrThrow()
@@ -155,13 +166,25 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
     // actions
 
     const loadRelatedTableMeta = async () => {
-      const relatedBaseId = colOptions.value.fk_related_base_id || base.value?.id
+      const relatedBaseId = colOptions.value.fk_related_base_id || column.value.base_id
       if (!relatedBaseId) {
         console.error('Cannot load related table meta: base_id not found')
         return
       }
 
-      await getMeta(relatedBaseId, colOptions.value.fk_related_model_id as string)
+      const tableId = colOptions.value.fk_related_model_id as string
+      const colId = colOptions.value.fk_column_id as string
+
+      // Try fetching full table meta first. If it fails (e.g., user lacks permission
+      // to access the related table), fall back to partial meta which only fetches
+      // the linked column metadata needed to render the LTAR cell.
+      try {
+        await getMeta(relatedBaseId, tableId, false, false, true)
+      } catch {}
+      const metaKey = `${relatedBaseId}:${tableId}`
+      if (!metas.value[metaKey]) {
+        await getPartialMeta(relatedBaseId, colId, tableId)
+      }
 
       if (isPublic.value) return
 
@@ -292,7 +315,7 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
      */
     const extractOnlyPrimaryValues = async (value: any, col: ColumnType) => {
       const currColOptions = (col.colOptions || {}) as LinkToAnotherRecordType
-      const relatedBaseId = currColOptions.fk_related_base_id || (base.value?.id as string)
+      const relatedBaseId = currColOptions.fk_related_base_id || column.value.base_id
 
       await getMeta(relatedBaseId, currColOptions.fk_related_model_id as string)
 
@@ -509,7 +532,7 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
             meta.value?.base_id ?? baseId,
             meta.value.id,
             encodeURIComponent(rowId.value),
-            colOptions.value.type as RelationTypes,
+            type.value,
             column?.value?.id,
             {
               limit: String(childrenExcludedListPagination.size),
@@ -531,9 +554,7 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
           // compare all keys and values
           childrenExcludedList.value.list.forEach((row: any, index: number) => {
             const found = (
-              [RelationTypes.BELONGS_TO, RelationTypes.ONE_TO_ONE].includes(colOptions.value.type)
-                ? [activeState[column.value.title]]
-                : activeState[column.value.title]
+              isSingleTargetRelation.value ? [activeState[column.value.title]] : activeState[column.value.title]
             ).find((a: any) => {
               let isSame = true
 
@@ -570,7 +591,7 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
 
       try {
         isChildrenLoading.value = true
-        if ([RelationTypes.BELONGS_TO, RelationTypes.ONE_TO_ONE].includes(colOptions.value.type)) return
+        if (isSingleTargetRelation.value && !isLinkV2(column.value)) return
         if (!column.value) return
         let offset = childrenListPagination.size * (childrenListPagination.page - 1) + childrenListOffsetCount.value
         if (offset < 0 || resetOffset) {
@@ -607,7 +628,7 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
             childrenList.value = await $api.public.dataNestedList(
               sharedView.value?.uuid as string,
               encodeURIComponent(rowId.value),
-              colOptions.value.type as RelationTypes,
+              type.value as RelationTypes,
               column.value.id,
               {
                 limit: String(childrenListPagination.size),
@@ -626,7 +647,7 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
               meta.value?.base_id ?? ((base?.value?.id || (sharedView.value?.view as any)?.base_id) as string),
               meta.value.id,
               encodeURIComponent(rowId.value),
-              colOptions.value.type as RelationTypes,
+              type.value as RelationTypes,
               column?.value?.id,
               {
                 limit: String(limit ?? childrenListPagination.size),
@@ -728,7 +749,7 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
           metaValue?.base_id ?? (base.value.id as string),
           metaValue.id!,
           encodeURIComponent(rowId.value),
-          colOptions.value.type as RelationTypes,
+          type.value as RelationTypes,
           column?.value?.id,
           encodeURIComponent(getRelatedTableRowId(row) as string),
         )
@@ -749,7 +770,7 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
         }
         isChildrenExcludedListLinked.value[index] = false
         isChildrenListLinked.value[index] = false
-        if (colOptions.value.type !== RelationTypes.BELONGS_TO && colOptions.value.type !== RelationTypes.ONE_TO_ONE) {
+        if (!isSingleTargetRelation.value) {
           childrenListCount.value = childrenListCount.value - 1
         }
       } catch (e: any) {
@@ -799,7 +820,7 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
           metaValue?.base_id ?? (base.value.id as string),
           metaValue.id as string,
           encodeURIComponent(rowId.value),
-          colOptions.value.type as RelationTypes,
+          type.value as RelationTypes,
           column?.value?.id,
           encodeURIComponent(getRelatedTableRowId(row) as string) as string,
         )
@@ -837,7 +858,7 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
         isChildrenExcludedListLinked.value[index] = true
         isChildrenListLinked.value[index] = true
 
-        if (colOptions.value.type !== RelationTypes.BELONGS_TO && colOptions.value.type !== RelationTypes.ONE_TO_ONE) {
+        if (!isSingleTargetRelation.value) {
           childrenListCount.value = childrenListCount.value + 1
         } else {
           isChildrenExcludedListLinked.value = Array(childrenExcludedList.value?.list.length).fill(false)

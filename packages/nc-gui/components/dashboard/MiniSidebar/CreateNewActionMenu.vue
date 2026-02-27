@@ -5,7 +5,7 @@ const { $e } = useNuxtApp()
 
 const { isUIAllowed, orgRoles, workspaceRoles } = useRoles()
 
-const { openedProject, showProjectList } = storeToRefs(useBases())
+const { openedProject } = storeToRefs(useBases())
 
 const { base, isSharedBase } = storeToRefs(useBase())
 
@@ -21,7 +21,7 @@ const { openNewDashboardModal } = useDashboardStore()
 
 const viewsStore = useViewsStore()
 const { loadViews, onOpenViewCreateModal } = viewsStore
-const { activeView } = storeToRefs(viewsStore)
+const { activeView, isListViewEnabled } = storeToRefs(viewsStore)
 
 const { isAiFeaturesEnabled } = useNocoAi()
 
@@ -105,7 +105,7 @@ const hasBaseCreateAccess = computed(() => {
 })
 
 const isBaseHomePage = computed(() => {
-  return !showProjectList.value && !!openedProject.value
+  return !!openedProject.value
 })
 
 const hasTableCreateAccess = computed(() => {
@@ -254,6 +254,12 @@ const hasDashboardCreateAccess = computed(() => {
                 <GeneralViewIcon :meta="{ type: ViewTypes.CALENDAR }" class="!w-4 !h-4" />
                 <div>{{ $t('objects.viewType.calendar') }}</div>
               </NcMenuItem>
+              <template v-if="isListViewEnabled">
+                <NcMenuItem data-testid="mini-sidebar-view-create-list" @click="onOpenModal({ type: ViewTypes.LIST })">
+                  <GeneralViewIcon :meta="{ type: ViewTypes.LIST }" />
+                  <div>{{ $t('objects.viewType.list') }}</div>
+                </NcMenuItem>
+              </template>
               <template v-if="isAiFeaturesEnabled">
                 <NcDivider />
                 <NcMenuItem data-testid="mini-sidebar-view-create-ai" @click="onOpenModal({ type: 'AI' })">

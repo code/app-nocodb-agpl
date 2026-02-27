@@ -34,7 +34,8 @@ import { ExtensionsService } from '~/services/extensions.service';
 
 @Injectable()
 export class UiPostOperations
-  implements InternalApiModule<InternalPOSTResponseType> {
+  implements InternalApiModule<InternalPOSTResponseType>
+{
   constructor(
     protected dataTableService: DataTableService,
     protected tablesService: TablesService,
@@ -58,7 +59,7 @@ export class UiPostOperations
     protected syncService: SyncService,
     protected readonly nocoJobsService: NocoJobsService,
     protected extensionsService: ExtensionsService,
-  ) { }
+  ) {}
   operations = [
     'tableUpdate' as const,
     'tableDelete' as const,
@@ -95,6 +96,7 @@ export class UiPostOperations
     'hookTest' as const,
     'hookTrigger' as const,
     'hookFilterCreate' as const,
+    'buttonFilterCreate' as const,
     'gridViewCreate' as const,
     'formViewCreate' as const,
     'galleryViewCreate' as const,
@@ -132,6 +134,8 @@ export class UiPostOperations
     'extensionCreate' as const,
     'extensionUpdate' as const,
     'extensionDelete' as const,
+    'listViewCreate' as const,
+    'listViewUpdate' as const,
   ];
   httpMethod = 'POST' as const;
 
@@ -238,11 +242,13 @@ export class UiPostOperations
         return await this.viewsService.showAllColumns(context, {
           viewId: req.query.viewId,
           ignoreIds: req.query.ignoreIds,
+          levelId: req.query.levelId,
         });
       case 'hideAllColumns':
         return await this.viewsService.hideAllColumns(context, {
           viewId: req.query.viewId,
           ignoreIds: req.query.ignoreIds,
+          levelId: req.query.levelId,
         });
       case 'viewColumnUpdate':
         return await this.viewColumnsService.columnUpdate(context, {
@@ -270,6 +276,8 @@ export class UiPostOperations
           color: payload.color,
           is_set_as_background: payload.is_set_as_background,
           nc_order: payload.nc_order,
+          type: payload.type,
+          fk_target_column_id: payload.fk_target_column_id,
           filter: payload.filter,
         });
       case 'viewRowColorConditionUpdate':
@@ -280,6 +288,8 @@ export class UiPostOperations
           color: payload.color,
           is_set_as_background: payload.is_set_as_background,
           nc_order: payload.nc_order,
+          type: payload.type,
+          fk_target_column_id: payload.fk_target_column_id,
         });
       case 'viewRowColorConditionDelete':
         return await this.viewRowColorService.deleteRowColoringCondition({

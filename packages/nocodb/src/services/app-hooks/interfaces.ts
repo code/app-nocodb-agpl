@@ -220,6 +220,13 @@ export interface FormViewUpdateEvent extends NcBaseEvent {
   owner: UserType;
 }
 
+export interface ListViewUpdateEvent extends NcBaseEvent {
+  view: ViewType;
+  listView: any;
+  oldListView: any;
+  owner: UserType;
+}
+
 type FilterEventAdditionalProp =
   | {
       hook: HookType;

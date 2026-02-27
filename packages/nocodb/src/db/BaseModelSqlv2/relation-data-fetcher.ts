@@ -51,11 +51,13 @@ export const relationDataFetcher = (param: {
         ids: _ids,
         apiVersion,
         nested = false,
+        linksAsLtar = false,
       }: {
         colId: string;
         ids: any[];
         apiVersion?: NcApiVersion;
         nested?: boolean;
+        linksAsLtar?: boolean;
       },
       args: { limit?; offset?; fieldsSet?: Set<string> } = {},
     ) {
@@ -104,13 +106,14 @@ export const relationDataFetcher = (param: {
           extractPkAndPv: true,
           fieldsSet: args.fieldsSet,
           pkAndPvOnly: relationColOpts.isCrossBaseLink() || hasLimitedAccess,
+          linksAsLtar,
         });
         const view = relationColOpts.fk_target_view_id
           ? await View.get(refContext, relationColOpts.fk_target_view_id)
           : await View.getFirstCollaborativeView(
-            refContext,
-            childBaseModel.model.id,
-          );
+              refContext,
+              childBaseModel.model.id,
+            );
         await childBaseModel.applySortAndFilter({
           table: childTable,
           where,
@@ -139,7 +142,7 @@ export const relationDataFetcher = (param: {
                 // get one extra record to check if there are more records in case of v3 api and nested
                 query.limit(
                   (+rest?.limit || 25) +
-                  (apiVersion === NcApiVersion.V3 && nested ? 1 : 0),
+                    (apiVersion === NcApiVersion.V3 && nested ? 1 : 0),
                 );
                 query.offset(+rest?.offset || 0);
 
@@ -176,11 +179,13 @@ export const relationDataFetcher = (param: {
         parentId,
         apiVersion,
         nested = false,
+        linksAsLtar = false,
       }: {
         colId: string;
         parentId: any;
         apiVersion?: NcApiVersion;
         nested?: boolean;
+        linksAsLtar?: boolean;
       },
       args: { limit?; offset?; fieldsSet?: Set<string> } = {},
       selectAllRecords = false,
@@ -253,6 +258,7 @@ export const relationDataFetcher = (param: {
         qb,
         fieldsSet: args.fieldsSet,
         pkAndPvOnly: relColOptions.isCrossBaseLink() || hasLimitedAccess,
+        linksAsLtar,
       });
 
       await refTable.getViews(refContext);
@@ -284,7 +290,7 @@ export const relationDataFetcher = (param: {
         // get one extra record to check if there are more records in case of v3 api and nested
         qb.limit(
           (+rest?.limit || 25) +
-          (apiVersion === NcApiVersion.V3 && nested ? 1 : 0),
+            (apiVersion === NcApiVersion.V3 && nested ? 1 : 0),
         );
       }
       qb.offset(selectAllRecords ? 0 : +rest?.offset || 0);
@@ -377,11 +383,13 @@ export const relationDataFetcher = (param: {
         colId,
         id,
         apiVersion,
+        linksAsLtar = false,
       }: {
         colId: string;
         id: any;
         apiVersion?: NcApiVersion;
         nested?: boolean;
+        linksAsLtar?: boolean;
       },
       args: { limit?; offset?; fieldSet?: Set<string> } = {},
     ) {
@@ -450,6 +458,7 @@ export const relationDataFetcher = (param: {
           qb,
           fieldsSet: args.fieldSet,
           pkAndPvOnly: relationColOpts.isCrossBaseLink() || hasLimitedAccess,
+          linksAsLtar,
         });
 
         await childBaseModel.applySortAndFilter({
@@ -564,11 +573,13 @@ export const relationDataFetcher = (param: {
         parentIds: _parentIds,
         apiVersion,
         nested = false,
+        linksAsLtar = false,
       }: {
         colId: string;
         parentIds: any[];
         apiVersion?: NcApiVersion;
         nested?: boolean;
+        linksAsLtar?: boolean;
       },
       args: { limit?; offset?; fieldsSet?: Set<string> } = {},
     ) {
@@ -639,6 +650,7 @@ export const relationDataFetcher = (param: {
         qb,
         fieldsSet: args.fieldsSet,
         pkAndPvOnly: relColOptions.isCrossBaseLink() || hasLimitedAccess,
+        linksAsLtar,
       });
 
       const view = relColOptions.fk_target_view_id
@@ -669,7 +681,7 @@ export const relationDataFetcher = (param: {
           // get one extra record to check if there are more records in case of v3 api and nested
           query.limit(
             (+rest?.limit || 25) +
-            (apiVersion === NcApiVersion.V3 && nested ? 1 : 0),
+              (apiVersion === NcApiVersion.V3 && nested ? 1 : 0),
           );
           query.offset(+rest?.offset || 0);
           return baseModel.isSqlite
@@ -902,10 +914,10 @@ export const relationDataFetcher = (param: {
         listArgs = dependencyFields;
         try {
           listArgs.filterArr = JSON.parse(listArgs.filterArrJson);
-        } catch (e) { }
+        } catch (e) {}
         try {
           listArgs.sortArr = JSON.parse(listArgs.sortArrJson);
-        } catch (e) { }
+        } catch (e) {}
       }
 
       const parentTable = await (

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ColumnType } from 'nocodb-sdk'
+import { type ColumnType, isMMOrMMLike } from 'nocodb-sdk'
 import { isCreatedOrLastModifiedByCol, isCreatedOrLastModifiedTimeCol } from 'nocodb-sdk'
 
 const props = defineProps<{
@@ -47,7 +47,7 @@ const isPrimaryCol = computed(() => isPrimary(column.value))
 const virtualCellType = computed(() => {
   if (isLink(column.value)) return 'link'
   if (isHm(column.value)) return 'hm'
-  if (isMm(column.value)) return 'mm'
+  if (isMMOrMMLike(column.value)) return 'mm'
   if (isBt(column.value)) return 'bt'
   if (isOo(column.value)) return 'oo'
   if (isRollup(column.value)) return 'rollup'

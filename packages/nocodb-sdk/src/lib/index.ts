@@ -27,6 +27,9 @@ export {
   isNumericCol,
   isVirtualCol,
   isLinksOrLTAR,
+  isLTARType,
+  isLinkV2,
+  isMMOrMMLike,
   isSelfLinkCol,
   isCreatedOrLastModifiedTimeCol,
   isCreatedOrLastModifiedByCol,
@@ -51,6 +54,7 @@ export {
   UITypesSearchTerms,
   isInUIType,
   hiddenColumnTypes,
+  LinksVersion,
 } from '~/lib/UITypes';
 export { default as CustomAPI, FileType } from '~/lib/CustomAPI';
 export { default as TemplateGenerator } from '~/lib/TemplateGenerator';
@@ -88,3 +92,5 @@ export * from '~/lib/CircularRefContext';
 export * from '~/lib/viewUtils';
 export * from '~/lib/workflow';
 export * from '~/lib/uniqueConstraintHelpers';
+export * from '~/lib/recordTemplate';
+export * from '~/lib/viewSection';

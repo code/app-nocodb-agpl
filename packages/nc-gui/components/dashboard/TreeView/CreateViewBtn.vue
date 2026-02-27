@@ -8,12 +8,17 @@ const props = defineProps<{
   source: Source
 }>()
 
+const emits = defineEmits<{
+  (event: 'createSection'): void
+}>()
+
 const { $e } = useNuxtApp()
 
 const alignLeftLevel = toRef(props, 'alignLeftLevel')
 
 const viewsStore = useViewsStore()
 const { loadViews, onOpenViewCreateModal } = viewsStore
+const { isListViewEnabled } = storeToRefs(viewsStore)
 
 const { isAiFeaturesEnabled } = useNocoAi()
 
@@ -28,6 +33,8 @@ const isOpen = ref(false)
 const isSqlView = computed(() => (table.value as TableType)?.type === 'view')
 
 const isSyncedTable = computed(() => (table.value as TableType)?.synced)
+
+const isPgSource = computed(() => props.source?.type === 'pg')
 
 const overlayClassName = computed(() => {
   if (alignLeftLevel.value === 1) return 'nc-view-create-dropdown nc-view-create-dropdown-left-1'
@@ -102,6 +109,11 @@ async function onOpenModal({
     tableId: table.value.id!,
     sourceId: table.value?.source_id,
   })
+}
+
+function onCreateSection() {
+  isOpen.value = false
+  emits('createSection')
 }
 </script>
 
@@ -186,6 +198,33 @@ async function onOpenModal({
             <GeneralIcon v-else class="plus" icon="plus" />
           </div>
         </NcMenuItem>
+        <template v-if="isListViewEnabled">
+          <NcTooltip :title="$t('tooltip.listViewOnlyPg')" :disabled="isPgSource" placement="right">
+            <NcMenuItem
+              :disabled="!isPgSource"
+              data-testid="sidebar-view-create-list"
+              @click="isPgSource && onOpenModal({ type: ViewTypes.LIST })"
+            >
+              <div class="item">
+                <div class="item-inner">
+                  <GeneralViewIcon :meta="{ type: ViewTypes.LIST }" :class="{ '!opacity-50': !isPgSource }" />
+                  <div>{{ $t('objects.viewType.list') }}</div>
+                </div>
+
+                <GeneralLoader v-if="toBeCreateType === ViewTypes.LIST && isViewListLoading" />
+                <GeneralIcon v-else class="plus" icon="plus" :class="{ '!text-current': !isPgSource }" />
+              </div>
+            </NcMenuItem>
+          </NcTooltip>
+        </template>
+
+        <template v-if="isEeUI">
+          <!-- Section -->
+          <NcDivider />
+
+          <DashboardTreeViewCreateViewBtnSectionMenu @create-section="onCreateSection" />
+        </template>
+
         <template v-if="isAiFeaturesEnabled">
           <NcDivider />
           <NcTooltip :title="`Auto suggest views for ${table?.title || 'the current table'}`" placement="right">
@@ -204,23 +243,21 @@ async function onOpenModal({
   </NcDropdown>
 </template>
 
-<style lang="scss" scoped>
-.item {
-  @apply flex flex-row items-center w-36 justify-between;
-}
-
-.item-inner {
-  @apply flex flex-row items-center gap-x-1.75;
-}
-
-.plus {
-  @apply text-nc-content-gray-muted;
-}
-</style>
-
 <style lang="scss">
 .nc-view-create-dropdown {
   @apply !max-w-43 !min-w-43;
+
+  .item {
+    @apply flex flex-row items-center w-36 justify-between;
+  }
+
+  .item-inner {
+    @apply flex flex-row items-center gap-x-1.75;
+  }
+
+  .plus {
+    @apply text-nc-content-gray-muted;
+  }
 }
 
 .nc-view-create-dropdown-left-1 {

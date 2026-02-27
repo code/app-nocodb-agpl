@@ -60,7 +60,7 @@ export class PublicDatasService {
 
     this.publicMetasService.checkViewBaseType(view, base);
 
-    if (view.password && view.password !== password) {
+    if (!(await View.verifyPassword(view, password))) {
       return NcError.get(context).invalidSharedViewPassword();
     }
 
@@ -140,7 +140,7 @@ export class PublicDatasService {
 
     this.publicMetasService.checkViewBaseType(view, base);
 
-    if (view.password && view.password !== password) {
+    if (!(await View.verifyPassword(view, password))) {
       return NcError.invalidSharedViewPassword();
     }
 
@@ -187,7 +187,7 @@ export class PublicDatasService {
 
     this.publicMetasService.checkViewBaseType(view, base);
 
-    if (view.password && view.password !== param.password) {
+    if (!(await View.verifyPassword(view, param.password))) {
       return NcError.invalidSharedViewPassword();
     }
 
@@ -243,7 +243,7 @@ export class PublicDatasService {
 
     this.publicMetasService.checkViewBaseType(view, base);
 
-    if (view.password && view.password !== param.password) {
+    if (!(await View.verifyPassword(view, param.password))) {
       return NcError.invalidSharedViewPassword();
     }
 
@@ -352,7 +352,7 @@ export class PublicDatasService {
       NcError.notFound('Not found');
     }
 
-    if (view.password && view.password !== param.password) {
+    if (!(await View.verifyPassword(view, param.password))) {
       return NcError.invalidSharedViewPassword();
     }
 
@@ -387,7 +387,7 @@ export class PublicDatasService {
 
     this.publicMetasService.checkViewBaseType(view, base);
 
-    if (view.password && view.password !== param.password) {
+    if (!(await View.verifyPassword(view, param.password))) {
       return NcError.invalidSharedViewPassword();
     }
 
@@ -504,7 +504,7 @@ export class PublicDatasService {
 
     this.publicMetasService.checkViewBaseType(view, base);
 
-    if (view.password && view.password !== param.password) {
+    if (!(await View.verifyPassword(view, param.password))) {
       return NcError.invalidSharedViewPassword();
     }
 
@@ -531,7 +531,7 @@ export class PublicDatasService {
     await view.model.getColumns(context);
 
     const fields = (view.model.columns = view.columns
-      .filter((c) => c.show)
+      .filter((c) => c.show && view.model.columnsById[c.fk_column_id])
       .reduce((o, c) => {
         o[view.model.columnsById[c.fk_column_id].title] = new Column({
           ...c,
@@ -629,7 +629,7 @@ export class PublicDatasService {
     const base = await Base.get(context, view.base_id);
 
     this.publicMetasService.checkViewBaseType(view, base);
-    if (view.password && view.password !== param.password) {
+    if (!(await View.verifyPassword(view, param.password))) {
       NcError.invalidSharedViewPassword();
     }
 
@@ -741,7 +741,7 @@ export class PublicDatasService {
     const base = await Base.get(context, view.base_id);
 
     this.publicMetasService.checkViewBaseType(view, base);
-    if (view.password && view.password !== param.password) {
+    if (!(await View.verifyPassword(view, param.password))) {
       NcError.invalidSharedViewPassword();
     }
 
@@ -824,7 +824,7 @@ export class PublicDatasService {
     const base = await Base.get(context, view.base_id);
 
     this.publicMetasService.checkViewBaseType(view, base);
-    if (view.password && view.password !== param.password) {
+    if (!(await View.verifyPassword(view, param.password))) {
       NcError.invalidSharedViewPassword();
     }
 
@@ -907,7 +907,7 @@ export class PublicDatasService {
     const base = await Base.get(context, view.base_id);
 
     this.publicMetasService.checkViewBaseType(view, base);
-    if (view.password && view.password !== password) {
+    if (!(await View.verifyPassword(view, password))) {
       return NcError.invalidSharedViewPassword();
     }
 
@@ -953,7 +953,7 @@ export class PublicDatasService {
     const base = await Base.get(context, view.base_id);
 
     this.publicMetasService.checkViewBaseType(view, base);
-    if (view.password && view.password !== param.password) {
+    if (!(await View.verifyPassword(view, param.password))) {
       return NcError.invalidSharedViewPassword();
     }
 
@@ -1016,7 +1016,7 @@ export class PublicDatasService {
     const base = await Base.get(context, view.base_id);
 
     this.publicMetasService.checkViewBaseType(view, base);
-    if (view.password && view.password !== param.password) {
+    if (!(await View.verifyPassword(view, param.password))) {
       return NcError.invalidSharedViewPassword();
     }
 
@@ -1098,7 +1098,7 @@ export class PublicDatasService {
 
     this.publicMetasService.checkViewBaseType(view, base);
 
-    if (view.password && view.password !== param.password) {
+    if (!(await View.verifyPassword(view, param.password))) {
       return NcError.invalidSharedViewPassword();
     }
 
