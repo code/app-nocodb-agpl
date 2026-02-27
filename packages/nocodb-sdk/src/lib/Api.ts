@@ -2977,7 +2977,9 @@ export interface ColumnType {
     | 'LastModifiedBy'
     | 'AI'
     | 'Order'
-    | 'Meta';
+    | 'Meta'
+    | 'Colour'
+    | 'UUID';
   /** Is Unsigned? */
   un?: BoolType;
   /** Is unique? */
@@ -3192,6 +3194,10 @@ export interface FilterType {
   fk_value_col_id?: StringOrNullType;
   /** Foreign Key to Link Column */
   fk_link_col_id?: StringOrNullType;
+  /** Foreign Key to RLS Policy */
+  fk_rls_policy_id?: StringOrNullType;
+  /** Foreign Key to Button Column */
+  fk_button_col_id?: StringOrNullType;
   /** Unique ID */
   id?: IdType;
   /** Is this filter grouped? */
@@ -3207,6 +3213,10 @@ export interface FilterType {
    * @example 1
    */
   order?: number;
+  /** Whether this filter is enabled. Disabled filters are skipped during evaluation. */
+  enabled?: BoolType;
+  /** Foreign Key to List View Level */
+  fk_level_id?: StringOrNullType;
 }
 
 /**
@@ -3349,6 +3359,10 @@ export interface FilterReqType {
   logical_op?: 'and' | 'not' | 'or';
   /** The filter value. Can be NULL for some operators. */
   value?: any;
+  /** Whether this filter is enabled. Disabled filters are skipped during evaluation. */
+  enabled?: BoolType;
+  /** Foreign Key to List View Level */
+  fk_level_id?: StringOrNullType;
 }
 
 export interface FollowerType {
@@ -3579,6 +3593,8 @@ export interface ButtonType {
   fk_integration_id?: string;
   /** AI model */
   model?: string;
+  /** Visibility condition filters for the button */
+  filters?: FilterType[];
 }
 
 /**
@@ -4268,7 +4284,7 @@ export interface LinkToAnotherColumnReqType {
   /** The title of the virtual column */
   title: string;
   /** The type of the relationship */
-  type: 'bt' | 'hm' | 'mm' | 'oo';
+  type: 'bt' | 'hm' | 'mm' | 'om' | 'mo' | 'oo';
   /** Abstract type of the relationship */
   uidt: 'LinkToAnotherRecord' | 'Links';
   /** Is this relationship virtual? */
@@ -4303,6 +4319,7 @@ export interface LinkToAnotherRecordType {
   base_id?: string;
   fk_related_source_id?: string;
   fk_mm_source_id?: string;
+  version?: number;
 }
 
 /**
@@ -4535,7 +4552,9 @@ export interface NormalColumnRequestType {
     | 'LastModifiedBy'
     | 'AI'
     | 'Order'
-    | 'Meta';
+    | 'Meta'
+    | 'Colour'
+    | 'UUID';
   /** Is this column unique? */
   un?: BoolType;
   /** Is this column unique? */
@@ -4777,6 +4796,10 @@ export interface BaseType {
       id: string;
     }[];
   }[];
+  /** Indicates if the base is a sandbox */
+  is_sandbox?: BoolType;
+  /** Indicates if the base is a sandbox master */
+  is_sandbox_master?: BoolType;
 }
 
 /**
@@ -5094,6 +5117,8 @@ export interface SortType {
    * @example p_9sx43moxhqtjm3
    */
   base_id?: string;
+  /** Foreign Key to List View Level */
+  fk_level_id?: StringOrNullType;
 }
 
 /**
@@ -5114,6 +5139,8 @@ export interface SortReqType {
   fk_column_id?: IdType;
   /** Sort direction */
   direction?: 'asc' | 'desc';
+  /** Foreign Key to List View Level */
+  fk_level_id?: StringOrNullType;
 }
 
 /**
@@ -5334,7 +5361,14 @@ export interface ViewType {
     | KanbanType
     | MapType
     | CalendarType
-    | (FormType & GalleryType & GridType & KanbanType & MapType & CalendarType);
+    | ListType
+    | (FormType &
+        GalleryType &
+        GridType &
+        KanbanType &
+        MapType &
+        CalendarType &
+        ListType);
   /** ID of view owner user */
   owned_by?: IdType;
   /** The row coloring mode whether it is select, condition or not set */
@@ -5920,6 +5954,118 @@ export interface CustomUrlType {
   original_path?: string;
   /** Custom url path */
   custom_path?: string;
+}
+
+/**
+ * Model for List View Level
+ */
+export interface ListViewLevelType {
+  /** Unique ID for Level */
+  id?: string;
+  /** Foreign Key to View */
+  fk_view_id?: string;
+  /** Level number (1, 2, or 3) */
+  level?: number;
+  /** Foreign Key to Model (table) for this level */
+  fk_model_id?: string;
+  /** Foreign Key to Link Column connecting levels */
+  fk_link_column_id?: string;
+  /** Enable nested records (Level 1 only) */
+  enable_nested_records?: BoolType;
+  /** Foreign Key to Self-Link Column */
+  fk_self_link_column_id?: string;
+  /** Wrap column headers in this level */
+  wrap_headers?: BoolType;
+  /** Meta data for this level */
+  meta?: MetaType;
+}
+
+/**
+ * Model for List View
+ */
+export interface ListType {
+  /** The ID of the source that this view belongs to */
+  source_id?: string;
+  /** Columns in this view */
+  columns?: ListColumnType[];
+  /** Foreign Key to View */
+  fk_view_id?: string;
+  /** Meta data for this view */
+  meta?: MetaType;
+  /** The order of the list */
+  order?: number;
+  /** The ID of the base that this view belongs to */
+  base_id?: string;
+  /** To show this view or not */
+  show?: boolean;
+  /** Title of List View */
+  title?: string;
+  /** Show empty parent sections */
+  show_empty_parents?: BoolType;
+  /** Row height for this list view */
+  row_height?: number;
+  /** Foreign Key to Prefix Column */
+  fk_prefix_column_id?: StringOrNullType;
+  /** Levels configuration for this list view */
+  levels?: ListViewLevelType[];
+}
+
+/**
+ * Model for List Column
+ */
+export interface ListColumnType {
+  /** The ID of the source */
+  source_id?: string;
+  /** Foreign Key to Column */
+  fk_column_id?: string;
+  /** Foreign Key to View */
+  fk_view_id?: string;
+  /** Foreign Key to Level */
+  fk_level_id?: string;
+  /** Unique ID of List Column */
+  id?: string;
+  /** The order in the list of columns */
+  order?: number;
+  /** The ID of the base */
+  base_id?: string;
+  /** Whether to show this column or not */
+  show?: number;
+  /** Column width */
+  width?: string;
+}
+
+/**
+ * Model for List View Update Request
+ */
+export interface ListUpdateReqType {
+  /** Meta data for this view */
+  meta?: MetaType;
+  /** Show empty parent sections */
+  show_empty_parents?: BoolType;
+  /** Row height for this list view */
+  row_height?: number;
+  /** Foreign Key to Prefix Column */
+  fk_prefix_column_id?: StringOrNullType;
+  /** Levels configuration for this list view */
+  levels?: ListViewLevelReqType[];
+}
+
+/**
+ * Model for List View Level Request
+ */
+export interface ListViewLevelReqType {
+  /** Level number (1, 2, or 3) */
+  level: number;
+  /** Foreign Key to Model (table) for this level */
+  fk_model_id: string;
+  /** Foreign Key to Link Column */
+  fk_link_column_id?: StringOrNullType;
+  /** Model for Bool */
+  enable_nested_records?: BoolType;
+  /** Foreign Key to Self-Link Column */
+  fk_self_link_column_id?: StringOrNullType;
+  /** Wrap column headers in this level */
+  wrap_headers?: BoolType;
 }
 
 import type {
@@ -11568,7 +11714,7 @@ export class Api<
       baseName: string,
       tableName: string,
       rowId: any,
-      relationType: 'mm' | 'hm' | 'bt' | 'oo',
+      relationType: 'mm' | 'hm' | 'bt' | 'oo' | 'ln',
       columnName: string,
       query?: {
         /** @min 1 */
@@ -11616,7 +11762,7 @@ export class Api<
       baseName: string,
       tableName: string,
       rowId: any,
-      relationType: 'mm' | 'hm' | 'bt' | 'oo',
+      relationType: 'mm' | 'hm' | 'bt' | 'oo' | 'ln',
       columnName: string,
       refRowId: string,
       query?: {
@@ -11683,7 +11829,7 @@ export class Api<
       baseName: string,
       tableName: string,
       rowId: any,
-      relationType: 'mm' | 'hm' | 'bt' | 'oo',
+      relationType: 'mm' | 'hm' | 'bt' | 'oo' | 'ln',
       columnName: string,
       refRowId: string,
       params: RequestParams = {}
@@ -11723,7 +11869,7 @@ export class Api<
       baseName: string,
       tableName: string,
       rowId: any,
-      relationType: 'mm' | 'hm' | 'bt' | 'oo',
+      relationType: 'mm' | 'hm' | 'bt' | 'oo' | 'ln',
       columnName: string,
       query?: {
         /** @min 1 */
@@ -12925,7 +13071,7 @@ export class Api<
     dataNestedList: (
       sharedViewUuid: string,
       rowId: any,
-      relationType: 'mm' | 'hm' | 'bt' | 'oo',
+      relationType: 'mm' | 'hm' | 'bt' | 'oo' | 'ln',
       columnName: string,
       query?: {
         /** Which fields to be shown */
