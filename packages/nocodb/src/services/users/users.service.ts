@@ -290,8 +290,6 @@ export class UsersService {
         user: user,
         req: param.req,
       });
-    } else {
-      return NcError.badRequest('Your email has not been registered.');
     }
 
     return true;
@@ -367,6 +365,9 @@ export class UsersService {
       reset_password_token: '',
       token_version: randomTokenString(),
     });
+
+    // delete all refresh tokens to invalidate existing sessions
+    await UserRefreshToken.deleteAllUserToken(user.id);
 
     this.appHooksService.emit(AppEvents.USER_PASSWORD_RESET, {
       user: user,
