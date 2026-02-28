@@ -1740,6 +1740,23 @@ export type ViewV3Type = {
         /** Row colour configuration for the the view. */
         row_coloring?: ViewRowColourV3Type;
       }
+    | {
+        type?: 'map';
+        options?: ViewOptionsMapV3Type;
+        /** List of sorts to be applied to the view. */
+        sorts?: SortCreateV3Type[];
+        filters?: FilterCreateUpdateV3Type;
+        /**
+         * List of fields to be displayed in the view.
+         *
+         * - If not specified, all fields are displayed by default.
+         * - If an empty array is provided, only the display value field will be shown.
+         * - In case of partial list, fields not included in the list will be excluded from the view.
+         */
+        fields?: ViewFieldsV3Type;
+        /** Row colour configuration for the the view. */
+        row_coloring?: ViewRowColourV3Type;
+      }
   );
 
 export type ViewUpdateV3Type = ViewBaseInUpdateV3Type &
@@ -1794,6 +1811,22 @@ export type ViewUpdateV3Type = ViewBaseInUpdateV3Type &
       }
     | {
         options?: ViewOptionsCalendarV3Type;
+        /** List of sorts to be applied to the view. */
+        sorts?: SortCreateV3Type[];
+        filters?: FilterCreateUpdateV3Type;
+        /**
+         * List of fields to be displayed in the view.
+         *
+         * - If not specified, all fields are displayed by default.
+         * - If an empty array is provided, only the display value field will be shown.
+         * - In case of partial list, fields not included in the list will be excluded from the view.
+         */
+        fields?: ViewFieldsV3Type;
+        /** Row colour configuration for the the view. */
+        row_coloring?: ViewRowColourV3Type;
+      }
+    | {
+        options?: ViewOptionsMapV3Type;
         /** List of sorts to be applied to the view. */
         sorts?: SortCreateV3Type[];
         filters?: FilterCreateUpdateV3Type;
@@ -1880,6 +1913,23 @@ export type ViewCreateV3Type = ViewBaseV3Type &
         /** Row colour configuration for the the view. */
         row_coloring?: ViewRowColourV3Type;
       }
+    | {
+        type?: 'map';
+        options?: ViewOptionsMapV3Type;
+        /** List of sorts to be applied to the view. */
+        sorts?: SortCreateV3Type[];
+        filters?: FilterCreateUpdateV3Type;
+        /**
+         * List of fields to be displayed in the view.
+         *
+         * - If not specified, all fields are displayed by default.
+         * - If an empty array is provided, only the display value field will be shown.
+         * - In case of partial list, fields not included in the list will be excluded from the view.
+         */
+        fields?: ViewFieldsV3Type;
+        /** Row colour configuration for the the view. */
+        row_coloring?: ViewRowColourV3Type;
+      }
   );
 
 export interface ViewOptionsFormV3Type {
@@ -1919,6 +1969,11 @@ export interface ViewOptionsFormV3Type {
    * @format uri
    */
   redirect_url?: string;
+}
+
+export interface ViewOptionsMapV3Type {
+  /** Foreign Key to GeoData Column to be used for the map view. */
+  fk_geo_data_col_id?: string;
 }
 
 export interface ViewOptionsGalleryV3Type {
@@ -2028,7 +2083,7 @@ export interface ViewBaseV3Type {
    *
    * Note: Form view via API is not supported currently
    */
-  type: 'grid' | 'gallery' | 'kanban' | 'calendar';
+  type: 'grid' | 'gallery' | 'kanban' | 'calendar' | 'map';
   /**
    * Lock type of the view.
    *
@@ -2050,7 +2105,7 @@ export interface ViewListV3Type {
     /** Description of the view. */
     description?: string | null;
     /** Type of the view. */
-    type: 'grid' | 'gallery' | 'kanban' | 'calendar' | 'form';
+    type: 'grid' | 'gallery' | 'kanban' | 'calendar' | 'form' | 'map';
     /** View configuration edit state. */
     lock_type: 'collaborative' | 'locked' | 'personal';
     /** User ID of the creator. */
@@ -2106,7 +2161,7 @@ export interface ViewSummaryV3Type {
   /** Name of the view. */
   title?: string;
   /** Type of the view. */
-  view_type?: 'grid' | 'gallery' | 'kanban' | 'calendar' | 'form';
+  view_type?: 'grid' | 'gallery' | 'kanban' | 'calendar' | 'form' | 'map';
 }
 
 export interface SortUpdateV3Type {
