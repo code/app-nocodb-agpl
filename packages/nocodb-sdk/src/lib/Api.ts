@@ -4896,6 +4896,8 @@ export interface ProjectReqType {
   type?: 'database' | 'documentation' | 'dashboard';
   /** Base Meta */
   meta?: MetaType;
+  /** Workspace ID */
+  fk_workspace_id?: string;
 }
 
 /**
@@ -6121,6 +6123,37 @@ export interface ListViewLevelReqType {
   fk_self_link_column_id?: StringOrNullType;
   /** Wrap column headers in this level */
   wrap_headers?: BoolType;
+}
+
+export interface WorkspaceUserType {
+  /** @format email */
+  email?: string;
+  fk_user_id?: string;
+  invite_accepted?: boolean;
+  invite_token?: string;
+  roles?: string;
+}
+
+export interface WorkspaceUserInviteType {
+  /** @format email */
+  email?: string;
+  roles?: string;
+}
+
+export interface WorkspaceUserListType {
+  list?: WorkspaceUserType[];
+  /** Model for Paginated */
+  pageInfo?: PaginatedType;
+}
+
+/**
+ * Model for Integration List
+ */
+export interface IntegrationListType {
+  /** List of Integration Models */
+  list: IntegrationType[];
+  /** Pagination Info */
+  pageInfo: PaginatedType;
 }
 
 import type {
@@ -16136,7 +16169,7 @@ export class Api<
      * @name List
      * @summary List integrations
      * @request GET:/api/v2/meta/integrations
-     * @response `200` `BaseUserDeleteRequestV3Type` OK
+     * @response `200` `IntegrationListType` OK
      */
     list: (
       query?: {
@@ -16150,7 +16183,7 @@ export class Api<
       },
       params: RequestParams = {}
     ) =>
-      this.request<BaseUserDeleteRequestV3Type, any>({
+      this.request<IntegrationListType, any>({
         path: `/api/v2/meta/integrations`,
         method: 'GET',
         query: query,
@@ -16287,6 +16320,59 @@ export class Api<
         method: 'POST',
         body: data,
         type: ContentType.Json,
+        ...params,
+      }),
+
+    /**
+     * @description List integrations
+     *
+     * @tags Integration
+     * @name WorkspaceList
+     * @summary List integrations
+     * @request GET:/api/v2/meta/workspaces/{workspaceId}/integrations
+     * @response `200` `IntegrationListType` OK
+     */
+    workspaceList: (
+      workspaceId: string,
+      query?: {
+        /** Integration Type */
+        type?: IntegrationsType;
+        includeDatabaseInfo?: boolean;
+        limit?: number;
+        offset?: number;
+        baseId?: string;
+        query?: string;
+      },
+      params: RequestParams = {}
+    ) =>
+      this.request<IntegrationListType, any>({
+        path: `/api/v2/meta/workspaces/${workspaceId}/integrations`,
+        method: 'GET',
+        query: query,
+        format: 'json',
+        ...params,
+      }),
+
+    /**
+     * @description Create integration
+     *
+     * @tags Integration
+     * @name WorkspaceCreate
+     * @summary Create integration
+     * @request POST:/api/v2/meta/workspaces/{workspaceId}/integrations
+     * @response `200` `IntegrationType` OK
+     */
+    workspaceCreate: (
+      workspaceId: string,
+      data: IntegrationReqType,
+      params: RequestParams = {}
+    ) =>
+      this.request<IntegrationType, any>({
+        path: `/api/v2/meta/workspaces/${workspaceId}/integrations`,
+        method: 'POST',
+        body: data,
+        type: ContentType.Json,
+        format: 'json',
         ...params,
       }),
   };
@@ -16567,6 +16653,112 @@ export class Api<
         path: `/api/v2/internal/${workspaceId}/${baseId}`,
         method: 'GET',
         query: query,
+        format: 'json',
+        ...params,
+      }),
+  };
+  workspaceUser = {
+    /**
+     * @description Workspace users list
+     *
+     * @tags Workspace user
+     * @name List
+     * @summary Workspace users list
+     * @request GET:/api/v1/workspaces/{workspaceId}/users
+     * @response `200` `WorkspaceUserListType` OK
+     */
+    list: (
+      workspaceId: string,
+      query?: {
+        includeDeleted?: boolean;
+      },
+      params: RequestParams = {}
+    ) =>
+      this.request<WorkspaceUserListType, any>({
+        path: `/api/v1/workspaces/${workspaceId}/users`,
+        method: 'GET',
+        query: query,
+        format: 'json',
+        ...params,
+      }),
+
+    /**
+     * @description Workspace user read
+     *
+     * @tags Workspace user
+     * @name Read
+     * @summary Workspace user read
+     * @request GET:/api/v1/workspaces/{workspaceId}/users/{userId}
+     * @response `200` `WorkspaceUserType` OK
+     */
+    read: (workspaceId: string, userId: string, params: RequestParams = {}) =>
+      this.request<WorkspaceUserType, any>({
+        path: `/api/v1/workspaces/${workspaceId}/users/${userId}`,
+        method: 'GET',
+        format: 'json',
+        ...params,
+      }),
+
+    /**
+     * @description Update workspace user
+     *
+     * @tags Workspace user
+     * @name Update
+     * @summary Update workspace user
+     * @request PATCH:/api/v1/workspaces/{workspaceId}/users/{userId}
+     * @response `200` `void` OK
+     */
+    update: (
+      workspaceId: string,
+      userId: string,
+      data: {
+        roles?: string;
+      },
+      params: RequestParams = {}
+    ) =>
+      this.request<void, any>({
+        path: `/api/v1/workspaces/${workspaceId}/users/${userId}`,
+        method: 'PATCH',
+        body: data,
+        type: ContentType.Json,
+        ...params,
+      }),
+
+    /**
+     * @description Delete workspace user
+     *
+     * @tags Workspace User
+     * @name Delete
+     * @summary Delete workspace user
+     * @request DELETE:/api/v1/workspaces/{workspaceId}/users/{userId}
+     * @response `200` `void` OK
+     */
+    delete: (workspaceId: string, userId: string, params: RequestParams = {}) =>
+      this.request<void, any>({
+        path: `/api/v1/workspaces/${workspaceId}/users/${userId}`,
+        method: 'DELETE',
+        ...params,
+      }),
+
+    /**
+     * @description Workspace user invite
+     *
+     * @tags Workspace user
+     * @name Invite
+     * @summary Workspace user invite
+     * @request POST:/api/v1/workspaces/{workspaceId}/invitations
+     * @response `200` `BaseUserDeleteRequestV3Type` OK
+     */
+    invite: (
+      workspaceId: string,
+      data: WorkspaceUserInviteType,
+      params: RequestParams = {}
+    ) =>
+      this.request<BaseUserDeleteRequestV3Type, any>({
+        path: `/api/v1/workspaces/${workspaceId}/invitations`,
+        method: 'POST',
+        body: data,
+        type: ContentType.Json,
         format: 'json',
         ...params,
       }),
