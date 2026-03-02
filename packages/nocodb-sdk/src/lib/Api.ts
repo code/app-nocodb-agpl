@@ -377,6 +377,37 @@ export interface TeamMemberV3V3Type {
 }
 
 /**
+ * A team member inherited from an ancestor team
+ */
+export interface InheritedTeamMemberV3V3Type {
+  /**
+   * Member email address
+   * @example user@example.com
+   */
+  user_email: string;
+  /**
+   * Member user ID
+   * @example usr_xxxx
+   */
+  user_id: string;
+  /**
+   * Member role in the ancestor team
+   * @example member
+   */
+  team_role: 'owner' | 'member';
+  /**
+   * ID of the ancestor team this member is inherited from
+   * @example tm_xxxx
+   */
+  inherited_from_team_id: string;
+  /**
+   * Title of the ancestor team this member is inherited from
+   * @example Engineering
+   */
+  inherited_from_team_title: string;
+}
+
+/**
  * Detailed team information for v3 API
  */
 export interface TeamDetailV3V3Type {
@@ -402,6 +433,8 @@ export interface TeamDetailV3V3Type {
   badge_color?: string;
   /** Team members */
   members: TeamMemberV3ResponseV3Type[];
+  /** Members inherited from ancestor teams */
+  inherited_members?: InheritedTeamMemberV3V3Type[];
 }
 
 /**
@@ -458,6 +491,11 @@ export interface TeamCreateV3ReqV3Type {
   badge_color?: string;
   /** Initial team members */
   members?: TeamMemberV3V3Type[];
+  /**
+   * Parent team ID. Null or omitted = root team.
+   * @example tmd_abc123
+   */
+  parent_team_id?: string | null;
 }
 
 /**
@@ -514,6 +552,22 @@ export interface TeamV3V3Type {
    * @format date-time
    */
   updated_at?: string;
+  /** Parent team ID. Null = root team. */
+  fk_parent_team_id?: string | null;
+  /**
+   * Depth in the team tree. Root teams have depth 0.
+   * @example 1
+   */
+  depth?: number;
+  /**
+   * Materialized path for efficient ancestor/descendant queries.
+   * @example /eng/fe/web
+   */
+  path?: string;
+  /** Whether the requesting user is a member of this team. */
+  is_member?: boolean;
+  /** List of user IDs who are owners/managers of this team. */
+  managers?: string[];
 }
 
 /**
