@@ -7,6 +7,26 @@ useUsers()
 
 const { toggleMode } = useMiniSidebarMode()
 
+const { toggleTheme, isThemeEnabled, selectedTheme } = useTheme()
+
+const themeLabel = computed(
+  () =>
+    ({
+      light: 'Light',
+      dark: 'Dark',
+      system: 'System',
+    }[selectedTheme.value]),
+)
+
+const themeIcon = computed(
+  () =>
+    ({
+      light: 'ncSun',
+      dark: 'ncMoon',
+      system: 'ncSunMoon',
+    }[selectedTheme.value] as IconMapKey),
+)
+
 const { isExperimentalFeatureModalOpen } = useBetaFeatureToggle()
 
 const { leftSidebarState } = storeToRefs(useSidebarStore())
@@ -122,8 +142,9 @@ const openKeyboardShortcutDialog = () => {
     <div class="flex items-center justify-center h-13">
       <NcDropdown
         v-model:visible="isMenuOpen"
-        placement="topLeft"
-        :overlay-class-name="`!min-w-44 md:!min-w-64 ${isMiniSidebar ? '!left-1' : ''}`"
+        placement="rightBottom"
+        :overlay-class-name="`!min-w-44 md:!min-w-64 nc-user-menu-dropdown`"
+        :align="{ offset: [12, 3] }"
       >
         <NcTooltip :disabled="isMobileMode" placement="right" hide-on-click :arrow="false">
           <template #title>
@@ -458,6 +479,34 @@ const openKeyboardShortcutDialog = () => {
 </style>
 
 <style lang="scss">
+.nc-user-menu-dropdown.nc-user-menu-dropdown {
+  overflow: visible !important;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: -6px;
+    bottom: 12px;
+    width: 0;
+    height: 0;
+    border-top: 7px solid transparent;
+    border-bottom: 7px solid transparent;
+    border-right: 7px solid var(--nc-border-gray-medium);
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    left: -5px;
+    bottom: 13px;
+    width: 0;
+    height: 0;
+    border-top: 6px solid transparent;
+    border-bottom: 6px solid transparent;
+    border-right: 6px solid var(--nc-bg-default);
+  }
+}
+
 .nc-lang-menu-overlay {
   .ant-popover-arrow-content {
     @apply dark:(border-1 border-nc-border-gray-medium);

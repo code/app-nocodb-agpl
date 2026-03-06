@@ -154,10 +154,15 @@ const hasDashboardCreateAccess = computed(() => {
 
 <template>
   <div v-if="!isSharedBase" class="nc-mini-sidebar-btn-full-width">
-    <NcDropdown v-model:visible="isVisibleCreateNew" placement="right" overlay-class-name="!min-w-48">
+    <NcDropdown
+      v-model:visible="isVisibleCreateNew"
+      placement="rightBottom"
+      overlay-class-name="!min-w-48 nc-create-new-dropdown"
+      :align="{ offset: [12, 3] }"
+    >
       <div class="w-full py-1 flex items-center justify-center">
         <div
-          class="border-1 w-7 h-7 flex-none rounded-full overflow-hidden transition-all duration-300 flex items-center justify-center bg-nc-bg-gray-medium cursor-pointer"
+          class="nc-mini-sidebar-plus-btn border-1 w-7 h-7 flex-none rounded-full overflow-hidden transition-all duration-300 flex items-center justify-center bg-nc-bg-gray-medium cursor-pointer"
           :class="{
             'border-nc-border-gray-dark': !isVisibleCreateNew,
             'active border-primary shadow-selected': isVisibleCreateNew,
@@ -375,3 +380,37 @@ const hasDashboardCreateAccess = computed(() => {
     <WorkspaceCreateProjectDlg v-model="baseCreateDlg" is-create-new-action-menu />
   </div>
 </template>
+
+<style lang="scss">
+.nc-mini-sidebar-plus-btn svg {
+  stroke-width: 2.5;
+}
+
+.nc-create-new-dropdown.nc-create-new-dropdown {
+  overflow: visible !important;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: -6px;
+    bottom: 11px;
+    width: 0;
+    height: 0;
+    border-top: 7px solid transparent;
+    border-bottom: 7px solid transparent;
+    border-right: 7px solid var(--nc-border-gray-medium);
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    left: -5px;
+    bottom: 13px;
+    width: 0;
+    height: 0;
+    border-top: 6px solid transparent;
+    border-bottom: 6px solid transparent;
+    border-right: 6px solid var(--nc-bg-default);
+  }
+}
+</style>
