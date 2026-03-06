@@ -458,6 +458,43 @@ const openKeyboardShortcutDialog = () => {
 </style>
 
 <style lang="scss">
+.nc-user-menu-dropdown.nc-user-menu-dropdown {
+  padding-left: 14px;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+
+  > .nc-menu {
+    @apply rounded-lg border-1 border-nc-border-gray-medium bg-nc-bg-default;
+    box-shadow: 0px 8px 24px -4px rgba(0, 0, 0, 0.18), 0px 4px 8px -2px rgba(0, 0, 0, 0.1);
+  }
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 8px;
+    bottom: 12px;
+    width: 0;
+    height: 0;
+    border-top: 7px solid transparent;
+    border-bottom: 7px solid transparent;
+    border-right: 7px solid var(--nc-border-gray-medium);
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    left: 9px;
+    bottom: 13px;
+    width: 0;
+    height: 0;
+    border-top: 6px solid transparent;
+    border-bottom: 6px solid transparent;
+    border-right: 6px solid var(--nc-bg-default);
+  }
+}
+
 .nc-lang-menu-overlay {
   .ant-popover-arrow-content {
     @apply dark:(border-1 border-nc-border-gray-medium);
