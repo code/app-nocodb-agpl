@@ -37,7 +37,7 @@ const { unreadCount } = toRefs(notificationStore)
 
 const isNotificationOpen = ref(false)
 
-const { isPanelExpanded: isChatPanelExpanded, hasWorkspaceContext: hasChatWorkspaceContext, toggleChatPanel } = useChatPanel()
+const { isPanelExpanded: isChatPanelExpanded, hasWorkspaceContext: hasChatWorkspaceContext, hasBaseContext: hasChatBaseContext, toggleChatPanel } = useChatPanel()
 
 const { blockAiChat, showEEFeatures } = useEeConfig()
 
@@ -228,7 +228,7 @@ const mainItems = computed<NavItem[]>(() => [
 
     <!-- AI Chat -->
     <DashboardMiniSidebarV2RailItem
-      v-if="isEeUI && !blockAiChat && hasChatWorkspaceContext && !isMobileMode"
+      v-if="isEeUI && !blockAiChat && hasChatWorkspaceContext && hasChatBaseContext && !isMobileMode"
       v-e="['c:chat:toggle']"
       label="Chat"
       panel-key="chat"

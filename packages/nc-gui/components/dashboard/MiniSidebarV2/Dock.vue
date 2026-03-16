@@ -37,7 +37,7 @@ const { unreadCount } = toRefs(notificationStore)
 
 const isNotificationOpen = ref(false)
 
-const { isPanelExpanded: isChatPanelExpanded, hasWorkspaceContext: hasChatWorkspaceContext, toggleChatPanel } = useChatPanel()
+const { isPanelExpanded: isChatPanelExpanded, hasWorkspaceContext: hasChatWorkspaceContext, hasBaseContext: hasChatBaseContext, toggleChatPanel } = useChatPanel()
 
 const { blockAiChat, showEEFeatures } = useEeConfig()
 
@@ -246,7 +246,7 @@ useEventListener(document, 'keydown', async (e: KeyboardEvent) => {
 
 // Cmd/Ctrl + Shift + A — toggle AI chat
 useEventListener(document, 'keydown', (e: KeyboardEvent) => {
-  if (!isEeUI || blockAiChat.value) return
+  if (!isEeUI || blockAiChat.value || !hasChatBaseContext.value) return
   const cmdOrCtrl = isMac() ? e.metaKey : e.ctrlKey
   if (
     cmdOrCtrl &&
@@ -305,7 +305,7 @@ useEventListener(document, 'keydown', (e: KeyboardEvent) => {
 
     <!-- AI Chat -->
     <DashboardMiniSidebarV2DockItem
-      v-if="isEeUI && !blockAiChat && hasChatWorkspaceContext && !isMobileMode"
+      v-if="isEeUI && !blockAiChat && hasChatWorkspaceContext && hasChatBaseContext && !isMobileMode"
       :ref="(el: any) => setItemRef('chat', el)"
       v-e="['c:chat:toggle']"
       label="Chat"

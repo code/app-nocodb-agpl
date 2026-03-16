@@ -103,7 +103,6 @@ const permissionScopes = {
     // AI
     'aiSchema',
 
-
     // Workspace user ops (internal, not exposed as CE API)
     'workspaceUserList',
     'workspaceInvite',
@@ -299,7 +298,6 @@ const rolePermissions:
     include: {
       workspaceUserList: true,
       workspaceInvite: true,
-
     },
   },
   [WorkspaceUserRoles.COMMENTER]: {
@@ -837,7 +835,6 @@ const permissionDescriptions: Record<string, string> = {
   mcpCreate: 'create a new MCP token',
   mcpUpdate: 'update an MCP token',
   mcpDelete: 'delete an MCP token',
-
 };
 
 // Human-readable descriptions for roles

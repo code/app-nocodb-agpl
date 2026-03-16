@@ -2,6 +2,7 @@ export default class ChatMessage {
   id?: string;
   fk_session_id?: string;
   fk_workspace_id?: string;
+  fk_base_id?: string;
   role?: string;
   content?: string | null;
   parts?: any[];

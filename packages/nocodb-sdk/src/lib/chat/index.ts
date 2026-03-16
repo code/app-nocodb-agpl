@@ -44,6 +44,7 @@ export interface ChatSessionType {
   id?: string;
   title?: string;
   fk_workspace_id: string;
+  fk_base_id: string;
   fk_user_id?: string;
   summary?: string;
   total_input_tokens?: number;
@@ -87,7 +88,6 @@ export const NC_NEW_SESSION = 'NC_SESSION';
 export interface ChatSendMessageType {
   content: string;
   approvals?: Record<string, 'approved' | 'denied'>;
-  base_id?: string;
   title?: string;
 }
 

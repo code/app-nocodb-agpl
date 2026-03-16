@@ -137,8 +137,6 @@ function handleMouseMove(e: MouseEvent) {
   }
 }
 
-const isChatToggling = ref(false)
-
 function onWindowResize(e?: any): void {
   // During chat toggle the watcher handles viewportWidth & percentage directly — skip here
   if (isChatToggling.value) return
