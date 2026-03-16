@@ -97,12 +97,24 @@ export type ChatContentBlock =
       metadata?: ChatToolMetadata;
     };
 
+export interface ChatAttachmentType {
+  title: string;
+  mimetype: string;
+  size: number;
+  path?: string;
+  url?: string;
+  signedPath?: string;
+  signedUrl?: string;
+  icon?: string;
+}
+
 export interface ChatMessageType {
   id?: string;
   fk_session_id: string;
   role: ChatMessageRole;
   content?: string | null;
   parts?: ChatContentBlock[];
+  files?: ChatAttachmentType[];
   model?: string;
   input_tokens?: number;
   output_tokens?: number;
@@ -114,6 +126,7 @@ export const NC_NEW_SESSION = 'NC_SESSION';
 
 export interface ChatSendMessageType {
   content: string;
+  files?: ChatAttachmentType[];
   approvals?: Record<string, 'approved' | 'denied'>;
   title?: string;
 }
