@@ -30,8 +30,6 @@ export const useChatStore = defineStore('chatStore', () => {
 
   const loadSessions = async (_wsId: string) => {}
 
-  const createSession = async (_wsId: string, _title?: string): Promise<ChatSessionType | undefined> => undefined
-
   const deleteSession = async (_wsId: string, _sessionId: string) => {}
 
   const renameSession = async (_wsId: string, _sessionId: string, _title: string) => {}
