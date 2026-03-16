@@ -201,6 +201,7 @@ const permissionScopes = {
     'nestedListCopyPasteOrDeleteAll',
     'baseUserList',
     'sourceCreate',
+    'columnAdd',
 
     // Base API Tokens
     'baseApiTokenList',
