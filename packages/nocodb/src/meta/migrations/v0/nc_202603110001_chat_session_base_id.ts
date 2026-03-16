@@ -8,10 +8,18 @@ const up = async (knex: Knex) => {
   await knex.schema.alterTable(MetaTable.CHAT_SESSIONS, (table) => {
     table.string('base_id', 20);
   });
+
+  await knex.schema.alterTable(MetaTable.CHAT_MESSAGES, (table) => {
+    table.string('base_id', 20);
+  });
 };
 
 const down = async (knex: Knex) => {
   await knex.schema.alterTable(MetaTable.CHAT_SESSIONS, (table) => {
+    table.dropColumn('base_id');
+  });
+
+  await knex.schema.alterTable(MetaTable.CHAT_MESSAGES, (table) => {
     table.dropColumn('base_id');
   });
 };
