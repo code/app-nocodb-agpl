@@ -1,3 +1,5 @@
+import type { ModelMeta } from '~/lib/v3/record-transform';
+
 export enum ChatMessageRole {
   USER = 'user',
   ASSISTANT = 'assistant',
@@ -57,6 +59,19 @@ export interface ChatSessionType {
 
 export type ChatToolVisibility = 'hidden' | 'action' | 'data' | 'ui';
 
+/**
+ * Typed metadata attached to tool_use blocks for frontend rendering.
+ * Each tool populates only the fields it needs via its `buildMeta` function.
+ */
+export interface ChatToolMetadata {
+  /** Primary model this tool operated on */
+  model?: ModelMeta;
+  /** modelId → ModelMeta for related models (LTAR, Links, Lookup, Rollup) */
+  modelMap?: Record<string, ModelMeta>;
+  /** columnId → modelId index for quick column → related model lookup */
+  columnModelMap?: Record<string, string>;
+}
+
 export type ChatContentBlock =
   | { type: 'text'; text: string }
   | {
@@ -69,6 +84,7 @@ export type ChatContentBlock =
       is_error?: boolean;
       agent?: string;
       visibility?: ChatToolVisibility;
+      metadata?: ChatToolMetadata;
     };
 
 export interface ChatMessageType {
