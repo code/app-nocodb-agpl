@@ -228,6 +228,9 @@ export function recordV2ToV3(
             columns: related.columns,
             depth: depth + 1,
           });
+        } else if (value == null) {
+          // Unlinked BT / OO — preserve null
+          transformedFields[key] = null;
         }
 
         // Skip LTAR fields with missing related meta — don't pass raw nested data
