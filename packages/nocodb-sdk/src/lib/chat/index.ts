@@ -63,6 +63,13 @@ export type ChatToolVisibility = 'hidden' | 'action' | 'data' | 'ui';
  * Typed metadata attached to tool_use blocks for frontend rendering.
  * Each tool populates only the fields it needs via its `buildMeta` function.
  */
+export interface WebSearchResultMeta {
+  title: string;
+  url: string;
+  publishedDate?: string | null;
+  favicon?: string | null;
+}
+
 export interface ChatToolMetadata {
   /** Primary model this tool operated on */
   model?: ModelMeta;
@@ -70,6 +77,8 @@ export interface ChatToolMetadata {
   modelMap?: Record<string, ModelMeta>;
   /** columnId → modelId index for quick column → related model lookup */
   columnModelMap?: Record<string, string>;
+  /** Web search/scrape results for ThinkingSection rendering */
+  webResults?: WebSearchResultMeta[];
 }
 
 export type ChatContentBlock =
