@@ -103,14 +103,6 @@ const permissionScopes = {
     // AI
     'aiSchema',
 
-    // Chat
-    'chatSessionCreate',
-    'chatSessionList',
-    'chatSessionGet',
-    'chatSessionDelete',
-    'chatMessageList',
-    'chatMessageSend',
-    'chatSuggestionsGet',
 
     // Workspace user ops (internal, not exposed as CE API)
     'workspaceUserList',
@@ -308,14 +300,6 @@ const rolePermissions:
       workspaceUserList: true,
       workspaceInvite: true,
 
-      // Chat
-      chatSessionCreate: true,
-      chatSessionList: true,
-      chatSessionGet: true,
-      chatSessionDelete: true,
-      chatMessageList: true,
-      chatMessageSend: true,
-      chatSuggestionsGet: true,
     },
   },
   [WorkspaceUserRoles.COMMENTER]: {
@@ -854,14 +838,6 @@ const permissionDescriptions: Record<string, string> = {
   mcpUpdate: 'update an MCP token',
   mcpDelete: 'delete an MCP token',
 
-  // Chat
-  chatSessionCreate: 'create a chat session',
-  chatSessionList: 'list chat sessions',
-  chatSessionGet: 'view a chat session',
-  chatSessionDelete: 'delete a chat session',
-  chatMessageList: 'list chat messages',
-  chatMessageSend: 'send a chat message',
-  chatSuggestionsGet: 'get chat suggestions',
 };
 
 // Human-readable descriptions for roles
