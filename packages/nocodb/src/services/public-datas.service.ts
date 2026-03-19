@@ -298,7 +298,7 @@ export class PublicDatasService {
 
     const { ast } = await getAst(context, {
       model,
-      query: param.query,
+      query: sanitizePublicQuery(param.query),
       view,
       includeRowColorColumns: query.include_row_color === 'true',
     });
@@ -666,7 +666,7 @@ export class PublicDatasService {
     });
 
     const { ast, dependencyFields } = await getAst(context, {
-      query: param.query,
+      query: sanitizePublicQuery(param.query),
       model,
       extractOnlyPrimaries: true,
     });
@@ -984,9 +984,10 @@ export class PublicDatasService {
     const dataListResults = await bulkFilterList.reduce(
       async (accPromise, dF: any) => {
         const acc = await accPromise;
+
         const result = await this.datasService.dataList(context, {
           query: {
-            ...dF,
+            ...sanitizePublicQuery(dF),
           },
           model,
           view,
