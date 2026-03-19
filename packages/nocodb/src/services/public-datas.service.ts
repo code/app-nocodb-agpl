@@ -23,6 +23,18 @@ export function sanitizeUrlPath(paths) {
   return paths.map((url) => url.replace(/[/.?#]+/g, '_'));
 }
 
+// Keys that must never be controllable by public/shared-view callers
+const PUBLIC_QUERY_BLOCKED_KEYS = ['getHiddenColumn', 'nested'];
+
+function sanitizePublicQuery<T extends Record<string, any>>(query: T): T {
+  if (!query) return query;
+  const sanitized = { ...query };
+  for (const key of PUBLIC_QUERY_BLOCKED_KEYS) {
+    delete sanitized[key];
+  }
+  return sanitized;
+}
+
 @Injectable()
 export class PublicDatasService {
   constructor(
