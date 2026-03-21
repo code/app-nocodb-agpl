@@ -549,7 +549,7 @@ END`,
     return {
       builder: knex.raw(`ARRAY(SELECT UNNEST(??) ORDER BY 1 ??)`, [
         source,
-        getSafeDirection(),
+        await getSafeDirection(),
       ]),
     };
   },
