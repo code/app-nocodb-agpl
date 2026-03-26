@@ -47,6 +47,12 @@ export interface AppInfo {
   feedEnabled: boolean
   sentryDSN: string
   isOnPrem: boolean
+  isPostgres: boolean
+  isAirgapped: boolean
+  seatLimit: number | null
+  isTrial: boolean
+  isTrialExpired: boolean
+  licenseExpiryTime: number
   defaultWorkspaceId: string | null
   stripePublishableKey?: string
   marketingRootUrl?: string
