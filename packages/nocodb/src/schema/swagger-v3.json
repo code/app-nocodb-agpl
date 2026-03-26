@@ -16243,10 +16243,6 @@
         "type": "object",
         "required": ["type", "position", "data"],
         "properties": {
-          "id": {
-            "type": "string",
-            "description": "Optional custom identifier. Auto-generated if omitted."
-          },
           "type": {
             "type": "string",
             "description": "Node type identifier."
