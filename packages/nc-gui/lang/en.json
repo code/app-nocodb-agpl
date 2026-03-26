@@ -1622,7 +1622,7 @@
     "editDescription": "Edit description",
     "editTableDescription": "Edit table description",
     "editFieldDescription": "Edit field description",
-    "convertToNewLink": "Upgrade",
+    "convertToNewLink": "Upgrade field",
     "legacyLinkColumn": "Legacy link column",
     "urlFormula": "URL Formula",
     "visibilityCondition": "Visibility condition",
