@@ -1949,20 +1949,6 @@ export enum BaseRolesV3Type {
 }
 
 /**
- * Model for Paginated
- */
-export interface PaginatedV3Type {
-  /** URL to access next page */
-  next?: string;
-  /** URL to access previous page */
-  prev?: string;
-  /** URL to access current page data with next set of nested fields data */
-  nestedNext?: string;
-  /** URL to access current page data with previous set of nested fields data */
-  nestedPrev?: string;
-}
-
-/**
  * V3 Nested Data List Response format - supports both single record and array responses
  */
 export interface DataNestedListResponseV3V3Type {
@@ -2063,6 +2049,8 @@ export type DataRecordWithDeletedV3V3Type = DataRecordV3V3Type & {
 export interface DataRecordV3V3Type {
   /** Record identifier (primary key value) */
   id: string | number;
+  /** Individual primary key field values as object */
+  id_fields?: Record<string, any>;
   /** Record fields data (excluding primary key). Undefined when empty. */
   fields?: Record<string, any>;
 }
@@ -4341,6 +4329,8 @@ export interface IntegrationReqType {
   sub_type?: string;
   /** ID of integration to be copied from. Used in Copy Integration. */
   copy_from_id?: StringOrNullType;
+  /** Whether the integration is restricted to specific bases */
+  is_restricted?: BoolType;
 }
 
 /**
@@ -4529,7 +4519,8 @@ export type ColumnReqType = (
       NormalColumnRequestType &
       RollupColumnReqType)
 ) & {
-  column_name?: string;
+  /** Model for StringOrNull */
+  column_name?: StringOrNullType;
   /** Model for TextOrNull */
   description?: TextOrNullType;
   /** Column order in a specific view */
@@ -6171,7 +6162,7 @@ export interface PaginatedType {
    */
   offset?: number;
   /**
-   * The number of pages
+   * The number of records per page
    * @example 10
    */
   pageSize?: number;
@@ -6180,6 +6171,20 @@ export interface PaginatedType {
    * @example 1
    */
   totalRows?: number;
+}
+
+/**
+ * Model for Paginated
+ */
+export interface PaginatedV3Type {
+  /** URL to access next page */
+  next?: string;
+  /** URL to access previous page */
+  prev?: string;
+  /** URL to access current page data with next set of nested fields data */
+  nestedNext?: string;
+  /** URL to access current page data with previous set of nested fields data */
+  nestedPrev?: string;
 }
 
 /**
