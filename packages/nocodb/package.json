@@ -248,5 +248,12 @@
     "ts-checker-rspack-plugin": "^1.2.1",
     "ts-jest": "29.2.5",
     "typescript": "^5.7.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "sqlite3",
+      "sharp",
+      "esbuild"
+    ]
   }
 }
