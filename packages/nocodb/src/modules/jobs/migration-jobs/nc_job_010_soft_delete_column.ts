@@ -166,6 +166,15 @@ export class SoftDeleteColumnMigration {
         `Found ${numberOfModelsToBeProcessed} models to process for soft delete + meta column`,
       );
 
+      // SQLite in scope → force serial; otherwise use PARALLEL_LIMIT.
+      const hasSqlite = !!(await ncMeta
+        .knexConnection(MetaTable.SOURCES)
+        .where('type', 'sqlite3')
+        .where((b) => b.where('is_meta', true).orWhere({ is_local: true }))
+        .first());
+      const concurrency = hasSqlite ? 1 : PARALLEL_LIMIT;
+      this.log(`Concurrency: ${concurrency}`);
+
       const wrapper = async (model: {
         id: string;
         source_id: string;
@@ -196,13 +205,13 @@ export class SoftDeleteColumnMigration {
         }
       };
 
-      const queue = new PQueue({ concurrency: PARALLEL_LIMIT });
+      const queue = new PQueue({ concurrency });
 
       // eslint-disable-next-line no-constant-condition
       while (true) {
         // PQueue.pending is capped at concurrency; waiting tasks accumulate
         // in .size. Guard on size to actually bound unprocessed backlog.
-        if (queue.size > PARALLEL_LIMIT * 2) {
+        if (queue.size > concurrency * 2) {
           await new Promise((resolve) => setTimeout(resolve, 1000));
           continue;
         }
@@ -211,7 +220,7 @@ export class SoftDeleteColumnMigration {
           (m) => m.processing,
         );
 
-        const models = await this.getModelsQuery(ncMeta);
+        const models = await this.getModelsQuery(ncMeta, concurrency);
 
         if (!models?.length) break;
 
@@ -650,45 +659,43 @@ export class SoftDeleteColumnMigration {
     await this.updateModelStatus(Noco.ncMeta, modelId, true);
   }
 
-  private getModelsQuery(ncMeta: MetaService) {
-    return ncMeta
-      .knexConnection(MetaTable.MODELS)
-      .select([
-        `${MetaTable.MODELS}.id`,
-        'source_id',
-        `${MetaTable.MODELS}.base_id`,
-        `${MetaTable.MODELS}.fk_workspace_id`,
-        `${MetaTable.MODELS}.table_name`,
-      ])
-      .where(`${MetaTable.MODELS}.mm`, false)
-      .join(
-        MetaTable.SOURCES,
-        `${MetaTable.MODELS}.source_id`,
-        '=',
-        `${MetaTable.SOURCES}.id`,
-      )
-      .where((builder) => {
-        builder.where(`${MetaTable.SOURCES}.is_meta`, true);
-        builder.orWhere({ is_local: true });
-      })
-      .whereNotIn(
-        `${MetaTable.MODELS}.id`,
-        ncMeta.knexConnection(TEMP_TABLE).select('fk_model_id'),
-      )
-      .whereNotIn(
-        `${MetaTable.MODELS}.id`,
-        this.processingModels.map((m) => m.fk_model_id),
-      )
-      .modify((qb) => {
-        if (TARGET_WORKSPACE_IDS) {
-          qb.whereIn(
-            `${MetaTable.MODELS}.fk_workspace_id`,
-            TARGET_WORKSPACE_IDS,
-          );
-        }
-      })
-      .orderBy(`${MetaTable.MODELS}.source_id`)
-      .limit(PARALLEL_LIMIT * 10);
+  private getModelsQuery(ncMeta: MetaService, concurrency: number) {
+    return (
+      ncMeta
+        .knexConnection(MetaTable.MODELS)
+        .select([
+          `${MetaTable.MODELS}.id`,
+          'source_id',
+          `${MetaTable.MODELS}.base_id`,
+          `${MetaTable.MODELS}.fk_workspace_id`,
+          `${MetaTable.MODELS}.table_name`,
+        ])
+        .where(`${MetaTable.MODELS}.mm`, false)
+        .join(
+          MetaTable.SOURCES,
+          `${MetaTable.MODELS}.source_id`,
+          '=',
+          `${MetaTable.SOURCES}.id`,
+        )
+        .where((builder) => {
+          builder.where(`${MetaTable.SOURCES}.is_meta`, true);
+          builder.orWhere({ is_local: true });
+        })
+        // NOT EXISTS instead of NOT IN (subquery). At large temp-table
+        // sizes (200k+), PG's NOT IN planner choked into 10+ minute
+        // anti-joins; NOT EXISTS plans cleanly against the fk_model_id index.
+        .whereNotExists((qb) =>
+          qb
+            .select(1)
+            .from(TEMP_TABLE)
+            .whereRaw(`${TEMP_TABLE}.fk_model_id = ${MetaTable.MODELS}.id`),
+        )
+        .whereNotIn(
+          `${MetaTable.MODELS}.id`,
+          this.processingModels.map((m) => m.fk_model_id),
+        )
+        .limit(concurrency * 10)
+    );
   }
 
   private async updateModelStatus(
