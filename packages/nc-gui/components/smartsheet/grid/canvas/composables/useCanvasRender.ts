@@ -2135,18 +2135,27 @@ export function useCanvasRender({
   }
 
   function renderAggregations(ctx: CanvasRenderingContext2D) {
+    // Snapshot reactive values once at the top of the pass so every offset within
+    // this footer pass is computed against the same values — guards against any
+    // mid-render mutation desyncing the per-cell rect, clip, and fillText calls
+    // within one column iteration. Matches the pattern in renderHeader/renderRow.
+    const _scrollLeft = scrollLeft.value
+    const _height = height.value
+    const _width = width.value
+    if (_height <= 0 || _width <= 0) return
+
     const { start: startColIndex, end: endColIndex } = colSlice.value
 
     // Top border
     ctx.beginPath()
     ctx.strokeStyle = getColor(themeV4Colors.gray['200'])
-    ctx.moveTo(0, height.value - AGGREGATION_HEIGHT - 0.5)
-    ctx.lineTo(width.value, height.value - AGGREGATION_HEIGHT - 0.5)
+    ctx.moveTo(0, _height - AGGREGATION_HEIGHT - 0.5)
+    ctx.lineTo(_width, _height - AGGREGATION_HEIGHT - 0.5)
     ctx.stroke()
 
     // Background
     ctx.fillStyle = getColor(themeV4Colors.gray['50'])
-    ctx.fillRect(0, height.value - AGGREGATION_HEIGHT, width.value, AGGREGATION_HEIGHT)
+    ctx.fillRect(0, _height - AGGREGATION_HEIGHT, _width, AGGREGATION_HEIGHT)
 
     let initialOffset = 0
 
@@ -2170,8 +2179,8 @@ export function useCanvasRender({
       const isHovered =
         isBoxHovered(
           {
-            x: xOffset - scrollLeft.value,
-            y: height.value - AGGREGATION_HEIGHT,
+            x: xOffset - _scrollLeft,
+            y: _height - AGGREGATION_HEIGHT,
             width,
             height: AGGREGATION_HEIGHT,
           },
@@ -2182,7 +2191,7 @@ export function useCanvasRender({
         ctx.save()
         ctx.beginPath()
 
-        ctx.rect(xOffset - scrollLeft.value, height.value - AGGREGATION_HEIGHT, width, AGGREGATION_HEIGHT)
+        ctx.rect(xOffset - _scrollLeft, _height - AGGREGATION_HEIGHT, width, AGGREGATION_HEIGHT)
         ctx.fill()
         ctx.clip()
 
@@ -2196,22 +2205,22 @@ export function useCanvasRender({
           ctx.fillStyle = getColor(themeV4Colors.gray['500'])
           ctx.fillText(
             column.agg_prefix,
-            xOffset + width - aggWidth - 16 - scrollLeft.value,
-            height.value - AGGREGATION_HEIGHT / 2,
+            xOffset + width - aggWidth - 16 - _scrollLeft,
+            _height - AGGREGATION_HEIGHT / 2,
           )
         }
 
         ctx.font = '600 12px Inter'
         ctx.fillStyle = getColor(themeV4Colors.gray['600'])
-        ctx.fillText(aggregationValue ?? ' - ', xOffset + width - 8 - scrollLeft.value, height.value - AGGREGATION_HEIGHT / 2)
+        ctx.fillText(aggregationValue ?? ' - ', xOffset + width - 8 - _scrollLeft, _height - AGGREGATION_HEIGHT / 2)
 
         if (isLocked.value && isHovered) {
           tryShowTooltip({
             mousePosition,
             text: 'Unlock this view to edit aggregation',
             rect: {
-              x: xOffset - scrollLeft.value,
-              y: height.value - AGGREGATION_HEIGHT,
+              x: xOffset - _scrollLeft,
+              y: _height - AGGREGATION_HEIGHT,
               width,
               height: AGGREGATION_HEIGHT,
             },
@@ -2224,7 +2233,7 @@ export function useCanvasRender({
           ctx.save()
           ctx.beginPath()
 
-          ctx.rect(xOffset - scrollLeft.value, height.value - AGGREGATION_HEIGHT, width, AGGREGATION_HEIGHT)
+          ctx.rect(xOffset - _scrollLeft, _height - AGGREGATION_HEIGHT, width, AGGREGATION_HEIGHT)
           ctx.fill()
           ctx.clip()
 
@@ -2233,8 +2242,8 @@ export function useCanvasRender({
           ctx.textAlign = 'right'
           ctx.textBaseline = 'middle'
 
-          const rightEdge = xOffset + width - 8 - scrollLeft.value
-          const textY = height.value - AGGREGATION_HEIGHT / 2
+          const rightEdge = xOffset + width - 8 - _scrollLeft
+          const textY = _height - AGGREGATION_HEIGHT / 2
 
           ctx.fillText('Summary', rightEdge, textY)
 
@@ -2253,8 +2262,8 @@ export function useCanvasRender({
             mousePosition,
             text: 'Unlock this view to add aggregation',
             rect: {
-              x: xOffset - scrollLeft.value,
-              y: height.value - AGGREGATION_HEIGHT,
+              x: xOffset - _scrollLeft,
+              y: _height - AGGREGATION_HEIGHT,
               width,
               height: AGGREGATION_HEIGHT,
             },
@@ -2264,8 +2273,8 @@ export function useCanvasRender({
 
       ctx.beginPath()
       ctx.strokeStyle = getColor(themeV4Colors.gray['100'])
-      ctx.moveTo(xOffset - scrollLeft.value, height.value - AGGREGATION_HEIGHT)
-      ctx.lineTo(xOffset - scrollLeft.value, height.value)
+      ctx.moveTo(xOffset - _scrollLeft, _height - AGGREGATION_HEIGHT)
+      ctx.lineTo(xOffset - _scrollLeft, _height)
       ctx.stroke()
 
       xOffset += width
@@ -2281,7 +2290,7 @@ export function useCanvasRender({
         const isHovered = isBoxHovered(
           {
             x: xOffset,
-            y: height.value - AGGREGATION_HEIGHT,
+            y: _height - AGGREGATION_HEIGHT,
             width: mergedWidth,
             height: AGGREGATION_HEIGHT,
           },
@@ -2290,7 +2299,7 @@ export function useCanvasRender({
 
         ctx.fillStyle =
           isHovered && isViewOperationsAllowed.value ? getColor(themeV4Colors.gray['100']) : getColor(themeV4Colors.gray['50'])
-        ctx.fillRect(xOffset, height.value - AGGREGATION_HEIGHT, mergedWidth, AGGREGATION_HEIGHT)
+        ctx.fillRect(xOffset, _height - AGGREGATION_HEIGHT, mergedWidth, AGGREGATION_HEIGHT)
 
         ctx.fillStyle = getColor(themeV4Colors.gray['500'])
         ctx.textBaseline = 'middle'
@@ -2299,7 +2308,7 @@ export function useCanvasRender({
         if (firstFixedCol.agg_fn && ![AllAggregations.None].includes(firstFixedCol.agg_fn as any)) {
           ctx.save()
           ctx.beginPath()
-          ctx.rect(xOffset, height.value - AGGREGATION_HEIGHT, mergedWidth, AGGREGATION_HEIGHT)
+          ctx.rect(xOffset, _height - AGGREGATION_HEIGHT, mergedWidth, AGGREGATION_HEIGHT)
           ctx.clip()
 
           const aggregationValue = firstFixedCol.aggregation?.toString()
@@ -2312,14 +2321,14 @@ export function useCanvasRender({
           if (firstFixedCol.agg_prefix) {
             ctx.font = '400 12px Inter'
             ctx.fillStyle = getColor(themeV4Colors.gray['500'])
-            ctx.fillText(firstFixedCol.agg_prefix, mergedWidth - aggWidth - 16, height.value - AGGREGATION_HEIGHT / 2)
+            ctx.fillText(firstFixedCol.agg_prefix, mergedWidth - aggWidth - 16, _height - AGGREGATION_HEIGHT / 2)
             const w = ctx.measureText(firstFixedCol.agg_prefix).width
             availWidth -= w
           }
 
           ctx.font = '600 12px Inter'
           ctx.fillStyle = getColor(themeV4Colors.gray['600'])
-          ctx.fillText(aggregationValue ?? ' - ', mergedWidth - 8, height.value - AGGREGATION_HEIGHT / 2)
+          ctx.fillText(aggregationValue ?? ' - ', mergedWidth - 8, _height - AGGREGATION_HEIGHT / 2)
 
           if (isLocked.value && isHovered) {
             tryShowTooltip({
@@ -2327,7 +2336,7 @@ export function useCanvasRender({
               text: 'Unlock this view to add aggregation.',
               rect: {
                 x: xOffset,
-                y: height.value - AGGREGATION_HEIGHT,
+                y: _height - AGGREGATION_HEIGHT,
                 width: mergedWidth,
                 height: AGGREGATION_HEIGHT,
               },
@@ -2341,14 +2350,14 @@ export function useCanvasRender({
           if (!isLocked.value) {
             ctx.save()
             ctx.beginPath()
-            ctx.rect(xOffset, height.value - AGGREGATION_HEIGHT, mergedWidth, AGGREGATION_HEIGHT)
+            ctx.rect(xOffset, _height - AGGREGATION_HEIGHT, mergedWidth, AGGREGATION_HEIGHT)
             ctx.clip()
 
             ctx.font = '600 10px Inter'
             ctx.textAlign = 'right'
 
             const rightEdge = xOffset + mergedWidth - 8
-            const textY = height.value - AGGREGATION_HEIGHT / 2
+            const textY = _height - AGGREGATION_HEIGHT / 2
 
             ctx.fillText('Summary', rightEdge, textY)
 
@@ -2370,7 +2379,7 @@ export function useCanvasRender({
               text: 'Unlock this view to add aggregation.',
               rect: {
                 x: xOffset,
-                y: height.value - AGGREGATION_HEIGHT,
+                y: _height - AGGREGATION_HEIGHT,
                 width: mergedWidth,
                 height: AGGREGATION_HEIGHT,
               },
@@ -2416,7 +2425,7 @@ export function useCanvasRender({
         const recordCountResult = renderSingleLineText(ctx, {
           text: `${Intl.NumberFormat('en', { notation: 'compact' }).format(count)} ${label}`,
           x: xOffset + 8,
-          y: height.value - AGGREGATION_HEIGHT + 2,
+          y: _height - AGGREGATION_HEIGHT + 2,
           fillStyle: getColor(themeV4Colors.gray['500']),
           textAlign: 'left',
           fontSize: 12,
@@ -2428,7 +2437,7 @@ export function useCanvasRender({
 
         if (isRlsEnabled) {
           const shieldX = xOffset + 8 + recordCountResult.width + 6
-          const shieldY = height.value - AGGREGATION_HEIGHT + (AGGREGATION_HEIGHT - 14) / 2
+          const shieldY = _height - AGGREGATION_HEIGHT + (AGGREGATION_HEIGHT - 14) / 2
 
           spriteLoader.renderIcon(ctx, {
             icon: 'ncShield' as IconMapKey,
@@ -2439,37 +2448,35 @@ export function useCanvasRender({
           })
         }
 
-        //  Not exactly sure, but height.value becomes zero, randomly when scroll
-        if (height.value) {
+        // _height was checked at function entry; safe to use directly here.
+        tryShowTooltip({
+          mousePosition,
+          text: `${count} ${label}`,
+          rect: {
+            x: xOffset,
+            y: _height - AGGREGATION_HEIGHT,
+            width: recordCountResult.width + 16,
+            height: AGGREGATION_HEIGHT,
+          },
+        })
+
+        if (isRlsEnabled) {
           tryShowTooltip({
             mousePosition,
-            text: `${count} ${label}`,
+            text: 'Row-level security is enabled. Some rows may be hidden based on your access permissions.',
             rect: {
-              x: xOffset,
-              y: height.value - AGGREGATION_HEIGHT,
-              width: recordCountResult.width + 16,
+              x: xOffset + 8 + recordCountResult.width + 6,
+              y: _height - AGGREGATION_HEIGHT,
+              width: 20,
               height: AGGREGATION_HEIGHT,
             },
           })
-
-          if (isRlsEnabled) {
-            tryShowTooltip({
-              mousePosition,
-              text: 'Row-level security is enabled. Some rows may be hidden based on your access permissions.',
-              rect: {
-                x: xOffset + 8 + recordCountResult.width + 6,
-                y: height.value - AGGREGATION_HEIGHT,
-                width: 20,
-                height: AGGREGATION_HEIGHT,
-              },
-            })
-          }
         }
 
         ctx.strokeStyle = getColor(themeV4Colors.gray['200'])
         ctx.beginPath()
-        ctx.moveTo(xOffset, height.value - AGGREGATION_HEIGHT)
-        ctx.lineTo(xOffset, height.value)
+        ctx.moveTo(xOffset, _height - AGGREGATION_HEIGHT)
+        ctx.lineTo(xOffset, _height)
         ctx.stroke()
 
         xOffset += mergedWidth
@@ -2480,7 +2487,7 @@ export function useCanvasRender({
           const isHovered = isBoxHovered(
             {
               x: xOffset,
-              y: height.value - AGGREGATION_HEIGHT,
+              y: _height - AGGREGATION_HEIGHT,
               width,
               height: AGGREGATION_HEIGHT,
             },
@@ -2488,14 +2495,14 @@ export function useCanvasRender({
           )
 
           ctx.fillStyle = getColor(themeV4Colors.gray['50'])
-          ctx.fillRect(xOffset, height.value - AGGREGATION_HEIGHT, width, AGGREGATION_HEIGHT)
+          ctx.fillRect(xOffset, _height - AGGREGATION_HEIGHT, width, AGGREGATION_HEIGHT)
 
           const aggregationValue = firstFixedCol.aggregation?.toString()
 
           if (isValidValue(aggregationValue)) {
             ctx.save()
             ctx.beginPath()
-            ctx.rect(xOffset, height.value - AGGREGATION_HEIGHT, width, AGGREGATION_HEIGHT)
+            ctx.rect(xOffset, _height - AGGREGATION_HEIGHT, width, AGGREGATION_HEIGHT)
             ctx.clip()
 
             ctx.font = '600 12px Inter'
@@ -2504,18 +2511,18 @@ export function useCanvasRender({
             if (column.agg_prefix) {
               ctx.font = '400 12px Inter'
               ctx.fillStyle = getColor(themeV4Colors.gray['500'])
-              ctx.fillText(column.agg_prefix, xOffset + width - aggWidth - 16, height.value - AGGREGATION_HEIGHT / 2)
+              ctx.fillText(column.agg_prefix, xOffset + width - aggWidth - 16, _height - AGGREGATION_HEIGHT / 2)
             }
 
             ctx.font = '600 12px Inter'
             ctx.fillStyle = getColor(themeV4Colors.gray['600'])
-            ctx.fillText(aggregationValue, xOffset + width - 8, height.value - AGGREGATION_HEIGHT / 2)
+            ctx.fillText(aggregationValue, xOffset + width - 8, _height - AGGREGATION_HEIGHT / 2)
 
             ctx.restore()
           } else if (isHovered) {
             ctx.save()
             ctx.beginPath()
-            ctx.rect(xOffset, height.value - AGGREGATION_HEIGHT, width, AGGREGATION_HEIGHT)
+            ctx.rect(xOffset, _height - AGGREGATION_HEIGHT, width, AGGREGATION_HEIGHT)
             ctx.clip()
 
             ctx.font = '600 10px Inter'
@@ -2524,7 +2531,7 @@ export function useCanvasRender({
             ctx.textBaseline = 'middle'
 
             const rightEdge = xOffset + width - 8
-            const textY = height.value - AGGREGATION_HEIGHT / 2
+            const textY = _height - AGGREGATION_HEIGHT / 2
 
             ctx.fillText('Summary', rightEdge, textY)
 
@@ -2543,8 +2550,8 @@ export function useCanvasRender({
 
           ctx.strokeStyle = getColor(themeV4Colors.gray['200'])
           ctx.beginPath()
-          ctx.moveTo(xOffset, height.value - AGGREGATION_HEIGHT)
-          ctx.lineTo(xOffset, height.value)
+          ctx.moveTo(xOffset, _height - AGGREGATION_HEIGHT)
+          ctx.lineTo(xOffset, _height)
           ctx.stroke()
 
           xOffset += width
@@ -2552,8 +2559,8 @@ export function useCanvasRender({
 
         ctx.strokeStyle = getColor(themeV4Colors.gray['100'])
         ctx.beginPath()
-        ctx.moveTo(xOffset, height.value - AGGREGATION_HEIGHT)
-        ctx.lineTo(xOffset, height.value)
+        ctx.moveTo(xOffset, _height - AGGREGATION_HEIGHT)
+        ctx.lineTo(xOffset, _height)
         ctx.stroke()
 
         ctx.shadowColor = 'transparent'
@@ -3657,46 +3664,51 @@ export function useCanvasRender({
     const ctx = getSafe2DContext(canvas)
     if (!ctx) return
 
+    // Snapshot reactive size values once per frame. If either is non-positive (a
+    // transient state useElementSize can briefly report during layout shifts),
+    // bail entirely — never write canvas.width/height to 0, since that wipes the
+    // bitmap and produces a "stuck" frame the next render has to recover from.
+    const _width = width.value
+    const _height = height.value
+    if (_width <= 0 || _height <= 0) return
+
     const dpr = window.devicePixelRatio || 1
-    const targetWidth = Math.round(width.value * dpr)
-    const targetHeight = Math.round(height.value * dpr)
+    const targetWidth = Math.round(_width * dpr)
+    const targetHeight = Math.round(_height * dpr)
 
     // Always sync CSS display size so the canvas matches the viewport.
     // This must happen outside the buffer-resize guard because Vue's template
     // binding (:width/:height) can reset canvas.width between renders, causing
     // the guard to skip while style.width is stale.
-    const cssWidth = `${width.value}px`
-    const cssHeight = `${height.value}px`
+    const cssWidth = `${_width}px`
+    const cssHeight = `${_height}px`
     if (canvas.style.width !== cssWidth) canvas.style.width = cssWidth
     if (canvas.style.height !== cssHeight) canvas.style.height = cssHeight
 
-    // DIAGNOSTIC: force-reset all 2D context state every frame by reassigning
-    // canvas.width. Setting canvas.width (even to the same value) is the only
-    // guaranteed way to clear a stale clip when the state stack is empty —
-    // ctx.restore() on an empty stack is a no-op, and setTransform does not
-    // affect clip. This trades GPU buffer reallocation cost (~5–15ms/frame) for
-    // certainty that a leaked clip from a previous frame can't persist.
-    //
-    // If this fixes the user's "header & aggregation footer stuck while body
-    // scrolls" bug, we've confirmed it's a clip-leak and need to find the
-    // upstream save/restore imbalance. If it doesn't fix it, the bug is
-    // somewhere other than canvas state corruption.
-    canvas.width = targetWidth
-    canvas.height = targetHeight
-    lastDpr = dpr
-    ctx.scale(dpr, dpr)
+    // Only reassign canvas.width/height when the buffer size actually needs to
+    // change. Reassigning every frame (even to the same value) reallocates the
+    // GPU buffer and adds 5-15ms of overhead per frame.
+    if (canvas.width !== targetWidth || canvas.height !== targetHeight || lastDpr !== dpr) {
+      canvas.width = targetWidth
+      canvas.height = targetHeight
+      lastDpr = dpr
+      ctx.scale(dpr, dpr)
+    } else {
+      // Reset transform stack on existing buffer (canvas.width assignment would
+      // do this implicitly, but we skipped it).
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    }
 
     // Save state at frame start to isolate clip regions and transforms.
-    // Previously, resizing the canvas every frame implicitly reset all state.
     // The try/finally guarantees ctx.restore() runs even if a render path throws —
     // without it, a throw mid-frame leaves the clip applied to the canvas state and
     // every subsequent frame inherits it. The visible symptom is the header (which
     // sits outside the clipped area) freezing while the body keeps repainting.
     ctx.save()
     try {
-      ctx.clearRect(0, 0, width.value, height.value)
+      ctx.clearRect(0, 0, _width, _height)
       ctx.fillStyle = getColor(themeV4Colors.gray['50'])
-      ctx.fillRect(0, 0, width.value, height.value)
+      ctx.fillRect(0, 0, _width, _height)
 
       let activeState
 
@@ -3710,7 +3722,7 @@ export function useCanvasRender({
       } else {
         ctx.save()
         ctx.fillStyle = baseColor.value
-        ctx.fillRect(0, 0, width.value, height.value)
+        ctx.fillRect(0, 0, _width, _height)
         ctx.restore()
 
         const { startIndex, endIndex, startGroupYOffset } = calculateGroupRange(
@@ -3719,7 +3731,7 @@ export function useCanvasRender({
           rowHeight.value,
           _headerRowHeight,
           totalGroups.value,
-          height.value,
+          _height,
           false,
           isAddingEmptyRowAllowed.value,
         )
@@ -3749,7 +3761,7 @@ export function useCanvasRender({
 
       // render the active cell state and clip the header and aggregation footer areas
       ctx.beginPath()
-      ctx.rect(0, _headerRowHeight, totalWidth.value, height.value - _headerRowHeight - AGGREGATION_HEIGHT)
+      ctx.rect(0, _headerRowHeight, totalWidth.value, _height - _headerRowHeight - AGGREGATION_HEIGHT)
       ctx.clip()
       postRenderCbk?.()
     } finally {
