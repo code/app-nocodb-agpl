@@ -339,8 +339,6 @@
     "load": "Load",
     "open": "Open",
     "close": "Close",
-    "pin": "Pin",
-    "unpin": "Unpin",
     "yes": "Yes",
     "no": "No",
     "ok": "OK",
@@ -2333,7 +2331,6 @@
     "past30Days": "Past 30 days",
     "earlier": "Earlier",
     "basesIn": "Bases in",
-    "docFieldEmpty": "No document yet",
     "noUsersFound": "No users found",
     "noRecipientsSelected": "No recipients selected",
     "goToDashboard": "Go to Dashboard",
@@ -2569,7 +2566,6 @@
     "selectBases": "Select bases"
   },
   "activity": {
-    "createDocument": "Create Document",
     "useTemplate": "Use template",
     "clickToResolve": "Click to resolve",
     "resolvedBy": "Resolved by",
