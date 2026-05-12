@@ -4080,7 +4080,12 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
           datas[0],
         );
       } else {
-        await this.afterBulkUpdate(existingRecords, updatedDataList, cookie);
+        await this.afterBulkUpdate(
+          existingRecords,
+          updatedDataList,
+          this.dbDriver,
+          cookie,
+        );
       }
 
       return [...updatedDataList, ...insertedDataList];
