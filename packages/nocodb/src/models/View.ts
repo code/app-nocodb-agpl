@@ -4,6 +4,7 @@ import {
   EventType,
   ExpandedFormMode,
   getFirstNonPersonalView,
+  isBcryptHash,
   isSystemColumn,
   NC_VIEW_PASSWORD_PROTECTED_SENTINEL,
   NcBaseError,
@@ -1662,7 +1663,7 @@ export default class View implements ViewType {
     // echo the stored hash back to us).
     if (
       password === NC_VIEW_PASSWORD_PROTECTED_SENTINEL ||
-      View.isHashedPassword(password)
+      isBcryptHash(password)
     ) {
       return;
     }
@@ -1687,13 +1688,6 @@ export default class View implements ViewType {
     });
   }
 
-  static isHashedPassword(password?: string | null): boolean {
-    return (
-      typeof password === 'string' &&
-      (password.startsWith('$2a$') || password.startsWith('$2b$'))
-    );
-  }
-
   /**
    * Mask the stored password value before returning a view to an
    * owner-facing API consumer.
@@ -1712,7 +1706,7 @@ export default class View implements ViewType {
     view: T,
   ): T {
     if (!view || !view.password) return view;
-    if (!View.isHashedPassword(view.password)) return view;
+    if (!isBcryptHash(view.password)) return view;
     return { ...view, password: NC_VIEW_PASSWORD_PROTECTED_SENTINEL };
   }
 
@@ -1724,7 +1718,7 @@ export default class View implements ViewType {
     if (!inputPassword) return false;
 
     // Support bcrypt hashed passwords (new) and plaintext (legacy)
-    if (view.password.startsWith('$2a$') || view.password.startsWith('$2b$')) {
+    if (isBcryptHash(view.password)) {
       return bcrypt.compare(inputPassword, view.password);
     }
 
@@ -1802,7 +1796,7 @@ export default class View implements ViewType {
     //  - Plaintext → hash with bcrypt before storage.
     if (
       updateObj.password === NC_VIEW_PASSWORD_PROTECTED_SENTINEL ||
-      View.isHashedPassword(updateObj.password)
+      isBcryptHash(updateObj.password)
     ) {
       delete updateObj.password;
     } else if (updateObj.password) {
