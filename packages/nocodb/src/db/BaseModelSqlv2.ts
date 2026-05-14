@@ -9308,6 +9308,9 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
     if (!deletedIds.length) return;
 
     const columns = await this.model.getColumns(this.context);
+    const deletedSet = new Set(deletedIds.map((id) => String(id)));
+    const filterSelfOverlap = <T>(ids: T[]): T[] =>
+      ids.filter((id) => !deletedSet.has(String(id)));
 
     for (const column of columns) {
       if (!isLinksOrLTAR(column)) continue;
@@ -9358,9 +9361,11 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
             null,
             { raw: true },
           );
-          const parentIds = [
-            ...new Set(fkRows.map((r) => r[childColumn.column_name])),
-          ] as string[];
+          const parentIds = filterSelfOverlap(
+            Array.from(
+              new Set(fkRows.map((r) => r[childColumn.column_name])),
+            ) as string[],
+          );
 
           if (parentIds.length) {
             await parentBaseModel.updateLastModified({
@@ -9411,8 +9416,8 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
             null,
             { raw: true },
           );
-          const linkedIds = linkedRows.map(
-            (r) => r[childTable.primaryKey.column_name],
+          const linkedIds = filterSelfOverlap(
+            linkedRows.map((r) => r[childTable.primaryKey.column_name]),
           );
 
           if (linkedIds.length) {
@@ -9462,7 +9467,9 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
             null,
             { raw: true },
           );
-          const linkedIds = linkedRows.map((r) => r[vParentCol.column_name]);
+          const linkedIds = filterSelfOverlap(
+            linkedRows.map((r) => r[vParentCol.column_name]),
+          );
 
           if (linkedIds.length) {
             await parentBaseModel.updateLastModified({
