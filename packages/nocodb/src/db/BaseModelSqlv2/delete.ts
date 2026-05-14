@@ -954,6 +954,27 @@ export class BaseModelDelete {
     if (oldRecords.length !== rowIds.length) {
       NcError.get(this.baseModel.context).recordNotTrashed();
     }
+    if (oldRecords.length !== rowIds.length) {
+      this.logger.warn(
+        `permanentDeleteByIds: ${rowIds.length - oldRecords.length} of ${
+          rowIds.length
+        } target rows are no longer trashed (restored or already hard-deleted). ` +
+          `Proceeding with the ${oldRecords.length} that remain.`,
+      );
+    }
+    // Narrow the ids list to only the rows we actually have, so the delete
+    // query targets the same set we'll report in `oldRecords`.
+    const survivingIds =
+      oldRecords.length === rowIds.length
+        ? ids
+        : this.baseModel.model.primaryKeys.length > 1
+        ? oldRecords.map((r) =>
+            this.baseModel.model.primaryKeys.reduce((acc, pk) => {
+              acc[pk.title] = r[pk.column_name];
+              return acc;
+            }, {} as Record<string, any>),
+          )
+        : oldRecords.map((r) => r[this.baseModel.model.primaryKey.column_name]);
 
     const rows = oldRecords;
 
