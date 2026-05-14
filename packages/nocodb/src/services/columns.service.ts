@@ -4132,9 +4132,8 @@ export class ColumnsService implements IColumnsService {
   async columnDelete(
     context: NcContext,
     param: {
-      req?: any;
+      req: NcRequest;
       columnId: string;
-      user: UserType;
       forceDeleteSystem?: boolean;
       skipLinkPlaceholder?: boolean;
       skipTrash?: boolean;
@@ -6488,7 +6487,6 @@ export class ColumnsService implements IColumnsService {
     await this.columnDelete(context, {
       columnId: op.column.id,
       req,
-      user: req.user,
     });
   }
 
