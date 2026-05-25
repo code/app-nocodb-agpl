@@ -1350,9 +1350,7 @@ export function useInfiniteData(args: {
         // new row, so we'd toast on every keystroke past the first. Compare
         // against the previous saveError and skip the toast (but keep the
         // marker updated) when the missing-field set is unchanged.
-        const missingFields = [...missingRequiredColumns]
-          .filter((f): f is string => typeof f === 'string')
-          .sort()
+        const missingFields = [...missingRequiredColumns].filter((f): f is string => typeof f === 'string').sort()
         const prev = currentRow.rowMeta.saveError
         const sameAsBefore =
           prev?.reason === 'missingRequired' &&
