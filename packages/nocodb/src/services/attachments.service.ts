@@ -301,8 +301,10 @@ export class AttachmentsService {
                 source: OperationSource.ATTACHMENTS,
               }),
             });
-            mimeType = response.headers['content-type']?.split(';')[0];
-            size = response.headers['content-length'];
+            mimeType = (response.headers['content-type'] as string)?.split(
+              ';',
+            )[0];
+            size = response.headers['content-length'] as string | undefined;
 
             if (size && +size > NC_ATTACHMENT_FIELD_SIZE) {
               NcError.get().invalidRequestBody(
