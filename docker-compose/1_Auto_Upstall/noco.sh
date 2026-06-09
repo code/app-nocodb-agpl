@@ -10,6 +10,10 @@ if [ "${1:-}" = "--debug" ]; then
   shift
 fi
 
+# Generated files (db.json, docker.env) hold DB credentials. Create them
+# owner-only from the start, not just chmod 600 after the fact.
+umask 077
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORK_DIR="${PWD}/nocodb"
 
@@ -107,60 +111,27 @@ get_public_ip() {
     || echo ""
 }
 
-# ── OS guard ──────────────────────────────────────────────────────────────────
-check_os() {
-  [ -n "$NOCO_SKIP_PREFLIGHT" ] && return 0
-  case "$(uname -s)" in
-    Linux) ;;
-    Darwin)
-      printf '\n%bNocoDB Production install needs Linux.%b\n' "$BOLD" "$NC"
-      printf '  For local evaluation on macOS, use Quickstart:\n'
-      printf '    %bcurl -fsSL https://install.nocodb.com/docker-compose.yml -o docker-compose.yml%b\n' "$DIM" "$NC"
-      printf '    %bdocker compose up -d%b\n\n' "$DIM" "$NC"
-      printf '  Docs: https://nocodb.com/docs/self-hosting/installation/quickstart\n\n'
-      exit 0
-      ;;
-    *)
-      fail "Unsupported OS: $(uname -s). Linux required for the Production installer."
-      ;;
-  esac
-}
-
 # ── Prerequisites ─────────────────────────────────────────────────────────────
-install_pkg() {
-  local pkg="$1"
-  if command -v apt-get >/dev/null 2>&1; then
-    sudo apt-get update -qq && sudo apt-get install -y -qq "$pkg"
-  elif command -v dnf >/dev/null 2>&1; then
-    sudo dnf install -y -q "$pkg"
-  elif command -v yum >/dev/null 2>&1; then
-    sudo yum install -y -q "$pkg"
-  elif command -v apk >/dev/null 2>&1; then
-    sudo apk add --quiet "$pkg"
-  else
-    fail "No supported package manager found; install $pkg manually and re-run."
-  fi
-}
-
+# Runs on Linux, macOS, and Windows (Git Bash / WSL). We don't install anything
+# for you: if a dependency is missing, we point you at it and ask you to re-run.
 check_prereqs() {
   [ -n "$NOCO_SKIP_PREFLIGHT" ] && return 0
   printf '\n%bNocoDB Auto-upstall%b\n' "$BOLD" "$NC"
   printf '%b═══════════════════════════════════════════%b\n' "$DIM" "$NC"
 
-  for tool in curl wget lsof openssl; do
-    if ! command -v "$tool" >/dev/null 2>&1; then
-      warn "$tool not installed; attempting to install"
-      install_pkg "$tool"
-    fi
-  done
-
+  local missing=""
   if ! command -v docker >/dev/null 2>&1; then
-    warn "Docker not installed; installing via get.docker.com"
-    wget -qO- https://get.docker.com/ | sh
+    missing="${missing}  • Docker (https://docs.docker.com/get-docker/)\n"
+  elif ! docker compose version >/dev/null 2>&1; then
+    missing="${missing}  • Docker Compose V2 plugin (https://docs.docker.com/compose/install/)\n"
   fi
+  command -v curl >/dev/null 2>&1 || missing="${missing}  • curl\n"
 
-  if ! docker compose version >/dev/null 2>&1; then
-    fail "Docker Compose V2 is required (run: docker compose version)"
+  if [ -n "$missing" ]; then
+    printf '\n%bMissing required tools:%b\n' "$BOLD" "$NC"
+    printf '%b' "$missing"
+    printf '\nInstall the tool(s) above, then re-run this installer.\n\n'
+    exit 1
   fi
 
   ok "Docker:  $(docker version --format '{{.Server.Version}}' 2>/dev/null || echo unknown)"
@@ -198,6 +169,7 @@ check_existing() {
 # ── Prompts ───────────────────────────────────────────────────────────────────
 collect_domain() {
   [ -n "$DOMAIN" ] && return 0
+  [ "$NON_INTERACTIVE" -eq 1 ] && return 0
   header "Domain"
   info "Enter the domain or IP for this NocoDB instance."
   info "Leave blank for local mode (http://localhost:8080, no SSL)."
@@ -280,6 +252,7 @@ collect_redis() {
 collect_acme_email() {
   [ "$MODE" = "production" ] || return 0
   [ -n "$ACME_EMAIL" ] && return 0
+  [ "$NON_INTERACTIVE" -eq 1 ] && fail "--acme-email is required in production mode (Let's Encrypt SSL)"
   header "Let's Encrypt"
   ask "Email for SSL certificate notifications"
   ACME_EMAIL="$REPLY"
@@ -385,7 +358,6 @@ NC_REDIS_URL=${REDIS_URL}
 NC_SITE_URL=${site_url}
 
 # Settings
-NC_ALLOW_LOCAL_EXTERNAL_DBS=true
 NC_SECURE_ATTACHMENTS=true
 NC_DISABLE_MUX=true
 EOF
@@ -596,13 +568,13 @@ parse_flags() {
       --non-interactive) NON_INTERACTIVE=1 ;;
       --quick)
         NON_INTERACTIVE=1
-        [ -z "$PG_MODE" ]    && { PG_MODE="bundled"; PG_USER="nocodb"; PG_PASSWORD="$(generate_password)"; }
+        [ -z "$PG_MODE" ]    && PG_MODE="bundled"
         [ -z "$REDIS_MODE" ] && { REDIS_MODE="bundled"; REDIS_URL="redis://redis:6379"; }
         ;;
       --domain=*)        DOMAIN="${1#*=}"; NON_INTERACTIVE=1 ;;
       --acme-email=*)    ACME_EMAIL="${1#*=}" ;;
       --image-tag=*)     IMAGE_TAG="${1#*=}" ;;
-      --pg=bundled)      PG_MODE="bundled"; PG_USER="nocodb"; PG_PASSWORD="$(generate_password)" ;;
+      --pg=bundled)      PG_MODE="bundled" ;;
       --pg=external)     PG_MODE="external" ;;
       --pg-host=*)       PG_HOST="${1#*=}" ;;
       --pg-port=*)       PG_PORT="${1#*=}" ;;
@@ -641,6 +613,9 @@ Non-interactive flags:
 HELP
         exit 0
         ;;
+      upgrade|start|stop|restart|scale|monitor|status|logs|down)
+        fail "'$1' is no longer a subcommand. This installer only generates the stack; manage it from the deploy dir (cd nocodb && docker compose ...), or run ./nocodb/update.sh to upgrade."
+        ;;
       *) fail "Unknown flag: $1 (try --help)" ;;
     esac
     shift
@@ -648,6 +623,15 @@ HELP
 }
 
 # ── Validation ────────────────────────────────────────────────────────────────
+apply_bundled_defaults() {
+  # Bundled Postgres needs a user + password. Fill any the operator omitted here,
+  # after all flags are parsed, so flag order (e.g. --pg-password before
+  # --pg=bundled) never clobbers an explicit value.
+  [ "$PG_MODE" = "bundled" ] || return 0
+  [ -n "$PG_USER" ]     || PG_USER="nocodb"
+  [ -n "$PG_PASSWORD" ] || PG_PASSWORD="$(generate_password)"
+}
+
 validate_non_interactive() {
   [ "$NON_INTERACTIVE" -eq 1 ] || return 0
 
@@ -657,6 +641,9 @@ validate_non_interactive() {
     [ -n "$PG_USER" ]     || fail "--pg-user is required when --pg=external"
     [ -n "$PG_PASSWORD" ] || fail "--pg-password is required when --pg=external"
     [ -n "$PG_SSL" ]      || PG_SSL="managed"
+    if [ "$PG_SSL" = "custom" ]; then
+      [ -f "$PG_CA_FILE" ] || fail "CA file not found: ${PG_CA_FILE:-<unset>}. --pg-ssl must be 'managed', 'none', or a path to an existing CA certificate."
+    fi
   fi
 
   [ -n "$REDIS_MODE" ] || fail "--redis=bundled or --redis=external is required in non-interactive mode"
@@ -668,6 +655,11 @@ validate_non_interactive() {
   if [ -z "$DOMAIN" ]; then
     DOMAIN=""
     MODE="local"
+  fi
+
+  # A real domain selects production (Traefik + Let's Encrypt), which needs an email.
+  if [ -n "$DOMAIN" ] && is_valid_domain "$DOMAIN" && [ -z "$ACME_EMAIL" ]; then
+    fail "--acme-email is required when --domain is a domain name (production SSL)"
   fi
 }
 
@@ -699,8 +691,8 @@ display_completion() {
 # ── Main ──────────────────────────────────────────────────────────────────────
 main() {
   parse_flags "$@"
+  apply_bundled_defaults
   validate_non_interactive
-  check_os
   check_prereqs
   check_selinux
   check_existing
