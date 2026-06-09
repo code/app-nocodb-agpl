@@ -45,6 +45,7 @@ IMAGE_TAG="latest"   # docker tag for nocodb/nocodb
 NON_INTERACTIVE=0
 NOCO_SKIP_PREFLIGHT="${NOCO_SKIP_PREFLIGHT:-}"   # when set, skip OS/Docker/port checks (testing & re-runs)
 SELINUX_SUFFIX=""    # ":Z" when SELinux is enforcing
+STACK_STARTED=0      # set to 1 once 'docker compose up -d' succeeds
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 header() { printf '\n%b── %s ──────────────────────────────────%b\n' "$BOLD" "$1" "$NC"; }
@@ -60,13 +61,13 @@ ask() {
   else
     printf '  %s: ' "$prompt"
   fi
-  read -r REPLY
+  read -r REPLY </dev/tty
   REPLY="${REPLY:-$default}"
 }
 
 ask_secret() {
   printf '  %s: ' "$1"
-  read -rs REPLY
+  read -rs REPLY </dev/tty
   echo
 }
 
@@ -77,7 +78,7 @@ pick() {
     ((i++))
   done
   printf '  > '
-  read -r REPLY
+  read -r REPLY </dev/tty
 }
 
 generate_password() {
@@ -160,7 +161,7 @@ check_existing() {
     warn "Existing configuration found at $WORK_DIR/"
     if [ "$NON_INTERACTIVE" -eq 0 ]; then
       printf '  Overwrite? [y/N] '
-      read -r confirm
+      read -r confirm </dev/tty
       [[ "$confirm" =~ ^[Yy] ]] || { info "Aborted."; exit 0; }
     fi
   fi
@@ -277,7 +278,7 @@ show_summary() {
 
   if [ "$NON_INTERACTIVE" -eq 0 ]; then
     printf '\n  Proceed? [Y/n] '
-    read -r confirm
+    read -r confirm </dev/tty
     if [[ "$confirm" =~ ^[Nn] ]]; then
       info "Aborted."
       exit 0
@@ -663,24 +664,65 @@ validate_non_interactive() {
   fi
 }
 
+# ── Run ───────────────────────────────────────────────────────────────────────
+# Fail fast when prompts are needed but no terminal is attached (e.g. a bare
+# `curl ... | bash` in a non-interactive context). Interactive prompts read from
+# /dev/tty, so a piped install still works as long as a terminal is present.
+require_tty() {
+  [ "$NON_INTERACTIVE" -eq 1 ] && return 0
+  if ! { true >/dev/tty; } 2>/dev/null; then
+    fail "No terminal available for interactive prompts. Re-run with flags, e.g.: curl -fsSL https://install.nocodb.com/noco.sh | bash -s -- --quick"
+  fi
+}
+
+# Bring the stack up. Skipped under NOCO_SKIP_PREFLIGHT (tests and config-only re-runs).
+start_stack() {
+  [ -n "$NOCO_SKIP_PREFLIGHT" ] && return 0
+  header "Starting NocoDB"
+  info "Pulling images and starting containers (first run can take a few minutes)…"
+  if ( cd "$WORK_DIR" && docker compose up -d ); then
+    STACK_STARTED=1
+  else
+    fail "Configuration is ready, but 'docker compose up -d' failed. Fix the issue above, then run: cd $WORK_DIR && docker compose up -d"
+  fi
+}
+
 # ── Display ───────────────────────────────────────────────────────────────────
 display_completion() {
   echo
   printf '%b═══════════════════════════════════════════%b\n' "$DIM" "$NC"
   printf '  %bDone.%b\n\n' "$BOLD" "$NC"
-  printf '  Files generated in: %s/\n' "$WORK_DIR"
-  printf '    docker-compose.yml, docker.env, nocodb/db.json, update.sh, .gitignore\n\n'
-  printf '  %bNext:%b\n' "$BOLD" "$NC"
-  printf '    cd %s\n' "$WORK_DIR"
-  printf '    docker compose up -d\n'
-  printf '    docker compose logs -f nocodb\n\n'
-  if [ "$MODE" = "production" ]; then
-    printf '  %bNocoDB will be available at:%b https://%s\n\n' "$GREEN" "$NC" "$DOMAIN"
-  elif [ "$MODE" = "production-ip" ]; then
-    printf '  %bNocoDB will be available at:%b http://%s%b (plaintext, no SSL)%b\n\n' "$GREEN" "$NC" "$DOMAIN" "$YELLOW" "$NC"
+
+  if [ "$STACK_STARTED" -eq 1 ]; then
+    if [ "$MODE" = "production" ]; then
+      printf '  %bNocoDB is starting at:%b https://%s\n' "$GREEN" "$NC" "$DOMAIN"
+      printf '    The TLS certificate can take a minute to issue on first run.\n\n'
+    elif [ "$MODE" = "production-ip" ]; then
+      printf '  %bNocoDB is starting at:%b http://%s%b (plaintext, no SSL)%b\n\n' "$GREEN" "$NC" "$DOMAIN" "$YELLOW" "$NC"
+    else
+      printf '  %bNocoDB is starting at:%b http://localhost:%s\n\n' "$GREEN" "$NC" "$HOST_PORT"
+    fi
+    printf '  %bManage the stack:%b\n' "$BOLD" "$NC"
+    printf '    cd %s\n' "$WORK_DIR"
+    printf '    docker compose logs -f nocodb   # follow startup logs\n'
+    printf '    docker compose ps               # container status\n'
+    printf '    docker compose down             # stop (keeps data)\n\n'
   else
-    printf '  %bNocoDB will be available at:%b http://localhost:%s\n\n' "$GREEN" "$NC" "$HOST_PORT"
+    printf '  Files generated in: %s/\n' "$WORK_DIR"
+    printf '    docker-compose.yml, docker.env, nocodb/db.json, update.sh, .gitignore\n\n'
+    printf '  %bStart it:%b\n' "$BOLD" "$NC"
+    printf '    cd %s\n' "$WORK_DIR"
+    printf '    docker compose up -d\n'
+    printf '    docker compose logs -f nocodb\n\n'
+    if [ "$MODE" = "production" ]; then
+      printf '  %bNocoDB will be available at:%b https://%s\n\n' "$GREEN" "$NC" "$DOMAIN"
+    elif [ "$MODE" = "production-ip" ]; then
+      printf '  %bNocoDB will be available at:%b http://%s%b (plaintext, no SSL)%b\n\n' "$GREEN" "$NC" "$DOMAIN" "$YELLOW" "$NC"
+    else
+      printf '  %bNocoDB will be available at:%b http://localhost:%s\n\n' "$GREEN" "$NC" "$HOST_PORT"
+    fi
   fi
+
   printf '  %bActivate your license:%b open NocoDB → Admin Panel → License → paste your key\n\n' "$BOLD" "$NC"
   printf '  %bHarden for production:%b\n' "$BOLD" "$NC"
   printf '    • Allow only 22/80/443 inbound (ufw / firewalld)\n'
@@ -693,6 +735,7 @@ main() {
   parse_flags "$@"
   apply_bundled_defaults
   validate_non_interactive
+  require_tty
   check_prereqs
   check_selinux
   check_existing
@@ -713,6 +756,7 @@ main() {
   generate_gitignore
   tighten_perms
 
+  start_stack
   display_completion
 }
 
