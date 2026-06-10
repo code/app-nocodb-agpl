@@ -1186,7 +1186,10 @@ export class MetaDiffsService {
                     pluralize(childModel.title || childModel.table_name),
                   );
                   await Column.insert<LinkToAnotherRecordColumn>(context, {
-                    uidt: UITypes.Links,
+                    // External-source relations use LinkToAnotherRecord (LTAR),
+                    // not the deprecated Links uidt. hm has no junction table,
+                    // so the version heuristic resolves this to LTAR v1.
+                    uidt: UITypes.LinkToAnotherRecord,
                     title,
                     fk_model_id: parentModel.id,
                     fk_related_model_id: childModel.id,
@@ -1400,7 +1403,9 @@ export class MetaDiffsService {
             fk_mm_parent_column_id:
               belongsToCols[1].colOptions.fk_child_column_id,
             type: RelationTypes.MANY_TO_MANY,
-            uidt: UITypes.Links,
+            // mm has a junction table (fk_mm_model_id set), so the version
+            // heuristic resolves LinkToAnotherRecord to LTAR v2.
+            uidt: UITypes.LinkToAnotherRecord,
             meta: {
               plural: pluralize(modelB.title),
               singular: singularize(modelB.title),
@@ -1424,7 +1429,9 @@ export class MetaDiffsService {
             fk_mm_parent_column_id:
               belongsToCols[0].colOptions.fk_child_column_id,
             type: RelationTypes.MANY_TO_MANY,
-            uidt: UITypes.Links,
+            // mm has a junction table (fk_mm_model_id set), so the version
+            // heuristic resolves LinkToAnotherRecord to LTAR v2.
+            uidt: UITypes.LinkToAnotherRecord,
             meta: {
               plural: pluralize(modelA.title),
               singular: singularize(modelA.title),
