@@ -202,6 +202,25 @@ export default class NocoCache {
     );
   }
 
+  // Additive list write: `sadd` the child key onto the parent SET without
+  // touching siblings. Safe under concurrent writers — unlike `appendToList`
+  // (destructive fallback when child is missing) and `setList` (deepDels the
+  // existing list before re-seeding). Also back-links the child's
+  // `parentKeys` to the SET so read-side TTL refresh keeps the SET alive.
+  public static async addToList(
+    context: CacheContext,
+    scope: string,
+    subListKeys: string[],
+    childKey: string,
+  ): Promise<boolean> {
+    if (this.cacheDisabled || isCacheBypassed()) return Promise.resolve(true);
+    return this.client.addToList(
+      `${this.prefix}:${cacheContext(context)}:${scope}`,
+      subListKeys,
+      `${this.prefix}:${cacheContext(context)}:${childKey}`,
+    );
+  }
+
   public static async update(
     context: CacheContext,
     key: string,
