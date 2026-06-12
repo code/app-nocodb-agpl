@@ -685,6 +685,12 @@ export class DataV3Service {
       source,
     });
 
+    // extractPksValues reads baseModel.model.primaryKeys, which is null until
+    // columns are loaded. The fresh model from getBaseModelSQL isn't hydrated in
+    // CE, so load columns before the first extractPksValues call below (the
+    // sibling nestedLink path does the same).
+    await baseModel.model.getColumns(baseModel.context);
+
     // Extract inserted record PK values via extractPksValues (NOT the single
     // primaryKey) so composite-PK tables get the full `___`-joined string. This
     // keeps the chunkList lookup and the recordMap keys consistent — keying by
