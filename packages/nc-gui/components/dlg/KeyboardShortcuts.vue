@@ -180,7 +180,7 @@ const shortcutList = [
     ],
   },
   {
-    title: 'Link To Another Record',
+    title: t('labels.linkToAnotherRecord'),
     shortcuts: [
       {
         keys: ['Tab'],

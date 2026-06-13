@@ -899,7 +899,7 @@ const supportedDocs: SupportedDocsType[] = [
     href: 'https://nocodb.com/docs/product-docs/automation/webhook/create-webhook',
   },
   {
-    title: 'Create webhook',
+    title: t('activity.createWebhook'),
     href: 'https://nocodb.com/docs/product-docs/automation/webhook',
   },
   {

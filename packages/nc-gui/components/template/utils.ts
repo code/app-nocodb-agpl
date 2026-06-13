@@ -11,7 +11,9 @@ export const tableColumns: NcTableColumnProps[] = [
     width: 33,
   },
   {
-    title: 'Column Name',
+    get title() {
+      return getI18n().global.t('labels.syncSchemaColName')
+    },
     name: 'Column Name',
     dataIndex: 'column_name',
     key: 'column_name',
