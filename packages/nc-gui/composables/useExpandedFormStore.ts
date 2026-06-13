@@ -289,7 +289,8 @@ const [useProvideExpandedFormStore, useExpandedFormStore] = useInjectionState(
               plan: details.higherPlan,
               period: formatDurationFromDays(+(details.limit ?? 14)),
             }),
-            limitOrFeature: PlanLimitTypes.LIMIT_AUDIT_RETENTION,
+            limitOrFeature: PlanLimitTypes.LIMIT_RECORD_AUDIT_RETENTION,
+            triggerSource: 'record-audit',
           })
         } else {
           message.error(errorInfo.message)

@@ -12,7 +12,8 @@ const { handleUpgradePlan, isPaymentEnabled } = useEeConfig()
 
 function showAuditUpgradeModal() {
   handleUpgradePlan({
-    limitOrFeature: PlanLimitTypes.LIMIT_AUDIT_RETENTION,
+    limitOrFeature: PlanLimitTypes.LIMIT_RECORD_AUDIT_RETENTION,
+    triggerSource: 'record-audit',
   })
 }
 
