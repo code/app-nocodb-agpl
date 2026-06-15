@@ -4,7 +4,6 @@ import { pluralize, singularize } from 'inflection';
 import { isLinksOrLTAR } from 'nocodb-sdk';
 import { getUniqueColumnAliasName, getUniqueColumnName } from './getUniqueName';
 import type { UserType } from 'nocodb-sdk';
-import type { RollupColumn } from '~/models';
 import type LinkToAnotherRecordColumn from '~/models/LinkToAnotherRecordColumn';
 import type Base from '~/models/Base';
 import type PGClient from '~/db/sql-client/lib/pg/PgClient';
@@ -20,7 +19,6 @@ import NcHelp from '~/utils/NcHelp';
 import NcConnectionMgrv2 from '~/utils/common/NcConnectionMgrv2';
 import Model from '~/models/Model';
 import Column from '~/models/Column';
-import { GridViewColumn } from '~/models';
 
 export const IGNORE_TABLES = [
   'nc_models',
@@ -144,7 +142,9 @@ export async function extractAndGenerateManyToManyRelations(
           fk_mm_parent_column_id:
             belongsToCols[1].colOptions.fk_child_column_id,
           type: RelationTypes.MANY_TO_MANY,
-          uidt: UITypes.Links,
+          // mm has a junction table (fk_mm_model_id set), so the version
+          // heuristic resolves LinkToAnotherRecord to LTAR v2.
+          uidt: UITypes.LinkToAnotherRecord,
           meta: {
             plural: pluralize(modelB.title),
             singular: singularize(modelB.title),
@@ -166,7 +166,9 @@ export async function extractAndGenerateManyToManyRelations(
           fk_mm_parent_column_id:
             belongsToCols[0].colOptions.fk_child_column_id,
           type: RelationTypes.MANY_TO_MANY,
-          uidt: UITypes.Links,
+          // mm has a junction table (fk_mm_model_id set), so the version
+          // heuristic resolves LinkToAnotherRecord to LTAR v2.
+          uidt: UITypes.LinkToAnotherRecord,
           meta: {
             plural: pluralize(modelA.title),
             singular: singularize(modelA.title),
@@ -361,7 +363,10 @@ export async function populateMeta(
       const virtualColumns = [
         ...hasMany.map((hm) => {
           return {
-            uidt: UITypes.Links,
+            // External-source relations use LinkToAnotherRecord (LTAR), not the
+            // deprecated Links uidt. hm has no junction table, so the version
+            // heuristic in Column.insertColOption resolves this to LTAR v1.
+            uidt: UITypes.LinkToAnotherRecord,
             type: 'hm',
             hm,
             title: pluralize(hm.title),
@@ -605,56 +610,4 @@ export async function populateMeta(
   logger?.(`Populating meta completed in ${t2.toFixed(1)}s`);
 
   return info;
-}
-
-export async function populateRollupColumnAndHideLTAR(
-  context: NcContext,
-  source: Source,
-  base: Base,
-) {
-  for (const model of await Model.list(context, {
-    base_id: base.id,
-    source_id: source.id,
-  })) {
-    const columns = await model.getColumns(context);
-    const hmAndMmLTARColumns = columns.filter(
-      (c) =>
-        c.uidt === UITypes.LinkToAnotherRecord &&
-        c.colOptions.type !== RelationTypes.BELONGS_TO &&
-        !c.system,
-    );
-
-    const views = await model.getViews(context);
-
-    for (const column of hmAndMmLTARColumns) {
-      const relatedModel = await column
-        .getColOptions<LinkToAnotherRecordColumn>(context)
-        .then((colOpt) => colOpt.getRelatedTable(context));
-      await relatedModel.getColumns(context);
-      const pkId =
-        relatedModel.primaryKey?.id ||
-        (await relatedModel.getColumns(context))[0]?.id;
-
-      await Column.insert<RollupColumn>(context, {
-        uidt: UITypes.Links,
-        title: getUniqueColumnAliasName(
-          await model.getColumns(context),
-          `${relatedModel.title}`,
-        ),
-        fk_rollup_column_id: pkId,
-        fk_model_id: model.id,
-        rollup_function: 'count',
-        fk_relation_column_id: column.id,
-        meta: {
-          singular: singularize(relatedModel.title),
-          plural: pluralize(relatedModel.title),
-        },
-      });
-
-      const viewCol = await GridViewColumn.list(context, views[0].id).then(
-        (cols) => cols.find((c) => c.fk_column_id === column.id),
-      );
-      await GridViewColumn.update(context, viewCol.id, { show: false });
-    }
-  }
 }
