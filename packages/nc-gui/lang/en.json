@@ -1422,6 +1422,8 @@
       "goodContrast": "Good contrast",
       "lowContrast": "This color may make button text hard to read",
       "brandColorHint": "Recolours buttons, links, and accents across the UI.",
+      "seoDescription": "Link preview description",
+      "seoDescriptionHint": "Shown under the title when a link to this instance is shared (Slack, WhatsApp, iMessage, search engines). Falls back to the product name when blank.",
       "emailBranding": "Email branding",
       "emailBrandingDescription": "These values override the default \"NocoDB Team\" footer in transactional emails (invites, password reset, etc.). Leave fields blank to keep the defaults.",
       "senderName": "Sender name",
@@ -1442,6 +1444,7 @@
       "placeholder": {
         "productName": "NocoDB",
         "brandColor": "#3366FF",
+        "seoDescription": "The smart no-code platform your team runs on.",
         "senderName": "NocoDB Inc",
         "footerText": "Build Databases As Spreadsheets : No-Coding Required",
         "footerUrl": "https://nocodb.com",

@@ -30,6 +30,12 @@ export interface WhiteLabelConfig {
   faviconUrl?: string | null;
   /** Hex color string (e.g. "#0D5A5A") used to override --color-brand-500 */
   brandColor?: string | null;
+  /**
+   * Description used for social/link-preview meta tags (og:description,
+   * twitter:description, <meta name="description">), injected into the SPA
+   * shell at serve time. Falls back to productName when unset.
+   */
+  seoDescription?: string | null;
   /** URL/path to the default form banner (4:1 ratio wide image shown when the form author hasn't uploaded one) */
   formBannerUrl?: string | null;
   /**
