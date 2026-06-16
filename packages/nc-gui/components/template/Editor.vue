@@ -411,7 +411,7 @@ function missingRequiredColumnsValidation(tn: string, showError = false) {
   const missingRequiredColumns = columns.value.filter(
     (c: Record<string, any>) =>
       (c.pk ? !c.ai && !c.cdf && !c.meta?.ag : !c.cdf && c.rqd) &&
-      !srcDestMapping.value[tn].some((r: Record<string, any>) => r.destCn === c.title),
+      !(srcDestMapping.value[tn] || []).some((r: Record<string, any>) => r.destCn === c.title),
   )
 
   if (missingRequiredColumns.length) {
@@ -776,11 +776,21 @@ async function importTemplate() {
 function mapDefaultColumns() {
   srcDestMapping.value = {}
   for (let i = 0; i < data.tables.length; i++) {
-    for (const col of importColumns[i]) {
+    const tableName = data.tables[i]?.table_name as string
+
+    // Seed an entry for EVERY table up front, even one with no import columns
+    // (e.g. an empty sheet). The key used to be created only inside the column
+    // loop below, so a column-less table got no entry — and every accessor that
+    // indexes srcDestMapping by table name (handleCheckAllRecord's `for..of`,
+    // the required-column validation, etc.) then hit `undefined`. This keeps the
+    // invariant: every table rendered from `data.tables` has a mapping entry.
+    const mapping = (srcDestMapping.value[tableName] ??= [])
+
+    for (const col of importColumns[i] || []) {
       const o = {
         srcCn: col.column_name,
         srcTitle: col.title,
-        destCn: undefined,
+        destCn: undefined as string | undefined,
         enabled: true,
         delimiter: DEFAULT_LINK_DELIMITER,
       }
@@ -792,10 +802,7 @@ function mapDefaultColumns() {
           o.enabled = false
         }
       }
-      if (!(data.tables[i].table_name in srcDestMapping.value)) {
-        srcDestMapping.value[data.tables[i].table_name] = []
-      }
-      srcDestMapping.value[data.tables[i].table_name].push(o)
+      mapping.push(o)
     }
   }
 }
@@ -835,7 +842,10 @@ function isSomeMappedSelected(tableName: string) {
 
 function handleCheckAllRecord(event: CheckboxChangeEvent, tableName: string) {
   const isChecked = event.target.checked
-  for (const record of srcDestMapping.value[tableName]) {
+  // Defensive: mapDefaultColumns now seeds an entry for every table, but keep
+  // the `|| []` fallback (matching the other accessors) so a not-yet-built
+  // mapping can't throw "not iterable".
+  for (const record of srcDestMapping.value[tableName] || []) {
     if (!record.destCn && isChecked) continue
 
     record.enabled = isChecked
