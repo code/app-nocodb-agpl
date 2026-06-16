@@ -36,6 +36,12 @@ export interface WhiteLabelConfig {
    * shell at serve time. Falls back to productName when unset.
    */
   seoDescription?: string | null;
+  /**
+   * URL/path to the social/link-preview card image (og:image, twitter:image).
+   * Best at 1200×630 (1.91:1) — a wide card, not a square logo. Falls back to
+   * the logo, then the NocoDB default, when unset.
+   */
+  ogImageUrl?: string | null;
   /** URL/path to the default form banner (4:1 ratio wide image shown when the form author hasn't uploaded one) */
   formBannerUrl?: string | null;
   /**
