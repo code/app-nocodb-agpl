@@ -124,6 +124,20 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
 
     const childrenListCount = ref(0)
 
+    // Buffered (deferred, not-yet-saved) links to surface in the child-list modal
+    // for an existing row edited in the expanded form. Kept as a dedicated ref
+    // synced explicitly via syncPendingLinkRows() — the buffers live on the
+    // row-store row as plain nested objects, which a computed on this store's
+    // (snapshot) currentRow would not track reactively.
+    const pendingLinkRows = ref<Record<string, any>[]>([])
+
+    // Refresh the dedicated pendingLinkRows ref from the live ltarState buffer.
+    // Normalises single-target (object) and multi-target (array) shapes.
+    const syncPendingLinkRows = () => {
+      const buffered = currentRow.value?.rowMeta?.ltarState?.[column.value?.title as string]
+      pendingLinkRows.value = !buffered ? [] : Array.isArray(buffered) ? [...buffered] : [buffered]
+    }
+
     const { t } = useI18n()
 
     const isPublic: Ref<boolean> = inject(IsPublicInj, ref(false))
@@ -735,6 +749,13 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
       } finally {
         isChildrenLoading.value = false
       }
+
+      // Seed the pending-links section when (re)opening the child list for an
+      // existing row in deferred mode, so already-buffered links show up.
+      if (shouldDefer.value && !isNewRow?.value && rowId.value) {
+        syncPendingLinkRows()
+      }
+
       return childrenList.value
     }
 
@@ -812,6 +833,33 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
       return isSameRelatedRow(buffered, relatedRow)
     }
 
+    // Drop a buffered (not-yet-saved) link by related-row identity — used by the
+    // pending-links section of the child list. Does NOT touch the index-keyed
+    // caches (childrenCachedLinkedState / isChildrenListLinked / excludedLinkedState)
+    // because a pending link has no persisted/excluded index. Mirrors link()'s
+    // asymmetric counting (link only increments for multi-target).
+    const removePendingLink = async (relatedRow: Record<string, any>) => {
+      if (!removeLTARRef || !rowStoreCurrentRow) return
+      await removeLTARRef(relatedRow, column.value as ColumnType, { skipRowDisplay: true })
+      if (isSingleTargetRelation.value) {
+        rowStoreCurrentRow.value.row[column.value.title!] = null
+      } else {
+        childrenListCount.value = Math.max(0, childrenListCount.value - 1)
+        const colVal = rowStoreCurrentRow.value.row[column.value.title!]
+        if (Array.isArray(colVal)) {
+          const idx = colVal.findIndex(
+            (r: Record<string, any>) => getRelatedTableRowId(r) === getRelatedTableRowId(relatedRow),
+          )
+          const next = [...colVal]
+          if (idx !== -1) next.splice(idx, 1)
+          rowStoreCurrentRow.value.row[column.value.title!] = next
+        } else {
+          rowStoreCurrentRow.value.row[column.value.title!] = Math.max(0, (+colVal || 0) - 1)
+        }
+      }
+      syncPendingLinkRows()
+    }
+
     const unlink = async (
       row: Record<string, any>,
       { metaValue = meta.value }: { metaValue?: TableType } = {},
@@ -868,6 +916,9 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
               rowStoreCurrentRow.value.row[column.value.title!] = Math.max(0, (+colVal || 0) - 1)
             }
           }
+
+          // Keep the child-list pending-links section in sync with the buffer.
+          syncPendingLinkRows()
         }
 
         isChildrenExcludedListLinked.value[index] = false
@@ -981,6 +1032,9 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
               rowStoreCurrentRow.value.row[column.value.title!] = (+colVal || 0) + 1
             }
           }
+
+          // Keep the child-list pending-links section in sync with the buffer.
+          syncPendingLinkRows()
         }
 
         isChildrenExcludedListLinked.value[index] = true
@@ -1281,6 +1335,7 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
       childrenCachedLoadingState.value = new Map()
       childrenChunkStates.value = []
       childrenCachedTotalRows.value = 0
+      pendingLinkRows.value = []
     }
 
     const debounceLoadChildrenExcludedList = useDebounceFn(loadChildrenExcludedList, 500)
@@ -1387,6 +1442,12 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
       fetchChildrenChunk,
       clearChildrenCache,
       resetChildrenCache,
+      // Deferred (unsaved) links surfaced in the child-list modal
+      shouldDefer,
+      isSingleTargetRelation,
+      pendingLinkRows,
+      removePendingLink,
+      isPendingUnlink,
     }
   },
   'ltar-store',

@@ -90,11 +90,23 @@ const {
   fetchChildrenChunk,
   clearChildrenCache,
   resetChildrenCache,
+  shouldDefer,
+  isSingleTargetRelation,
+  pendingLinkRows,
+  removePendingLink,
 } = useLTARStoreOrThrow()
 
 const { withLoading } = useLoadingTrigger()
 
 const { isNew, state, removeLTARRef, addLTARRef } = useSmartsheetRowStoreOrThrow()
+
+// Buffered (unsaved) links to show ABOVE the persisted virtual list. Only for an
+// existing row edited in the expanded form (deferred mode) and multi-target
+// relations — grid inline (shouldDefer=false) and new rows (rendered via the
+// normal list) are unaffected; single-target uses the row mirror + count.
+const showPendingLinks = computed(
+  () => shouldDefer.value && !isNew.value && !isSingleTargetRelation.value && pendingLinkRows.value.length > 0,
+)
 
 const { showRecordPlanLimitExceededModal } = useEeConfig()
 
@@ -472,7 +484,7 @@ const { handleSearchKeydown: handleKeyDown } = useLTARListKeyNav({
         />
       </div>
       <div ref="scrollContainerRef" class="flex-1 overflow-auto nc-scrollbar-thin" @scroll="onListScroll">
-        <div v-if="isDataExist || isChildrenLoading || childrenCachedTotalRows > 0">
+        <div v-if="isDataExist || isChildrenLoading || childrenCachedTotalRows > 0 || showPendingLinks">
           <template v-if="isChildrenLoading && childrenCachedRows.size === 0">
             <div
               v-for="(_x, i) in Array.from({ length: skeletonCount })"
@@ -497,6 +509,25 @@ const { handleSearchKeydown: handleKeyDown } = useLTARListKeyNav({
             </div>
           </template>
           <template v-else>
+            <!-- Unsaved (buffered) links — shown above the persisted list until save -->
+            <LazyVirtualCellComponentsListItem
+              v-for="(pItem, pi) in showPendingLinks ? pendingLinkRows : []"
+              :key="`pending-${pi}`"
+              :attachment="attachmentCol"
+              :display-value-type-and-format-prop="displayValueTypeAndFormatProp"
+              :fields="fields"
+              :display-value-column="relatedTableDisplayValueColumn"
+              :is-linked="true"
+              :is-loading="false"
+              :related-table-display-value-prop="relatedTableDisplayValueProp"
+              :row="pItem"
+              data-testid="nc-child-list-item-pending"
+              @link-or-unlink="removePendingLink(pItem)"
+              @expand="onClick(pItem)"
+              @keydown.space.prevent.stop="() => removePendingLink(pItem)"
+              @keydown.enter.prevent.stop="() => removePendingLink(pItem)"
+            />
+
             <!-- Top spacer for virtual scroll -->
             <div :style="{ height: `${rowSlice.start * ROW_HEIGHT}px` }" />
 
