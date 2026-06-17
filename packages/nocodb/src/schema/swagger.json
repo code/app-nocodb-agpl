@@ -27997,6 +27997,11 @@
           "fk_level_id": {
             "$ref": "#/components/schemas/StringOrNull",
             "description": "Foreign Key to List View Level"
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether this sort is enabled. Disabled sorts are skipped during evaluation.",
+            "nullable": true
           }
         },
         "x-stoplight": {
@@ -28114,6 +28119,11 @@
           "fk_level_id": {
             "$ref": "#/components/schemas/StringOrNull",
             "description": "Foreign Key to List View Level"
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether this sort is enabled. Disabled sorts are skipped during evaluation.",
+            "nullable": true
           }
         },
         "x-stoplight": {

@@ -11,6 +11,8 @@ const isPublic = inject(IsPublicInj, ref(false))
 const { t } = useI18n()
 const { eventBus, isList } = useSmartsheetStoreOrThrow()
 
+const { blockToggleSort, showUpgradeToUseToggleSort } = useEeConfig()
+
 const listViewStore = isList.value ? useListViewStoreOrThrow() : undefined
 const isListConfigured = computed(
   () => (listViewStore?.isConfigured.value ?? false) && (listViewStore?.levels.value?.length ?? 0) > 1,
@@ -33,6 +35,8 @@ const { appearanceConfig: filteredOrSortedAppearanceConfig } = useColumnFiltered
 const showCreateSort = ref(false)
 
 const { appInfo, isMobileMode } = useGlobal()
+
+const { $e } = useNuxtApp()
 
 const { getPlanLimit } = useWorkspace()
 
@@ -164,6 +168,16 @@ watch(open, () => {
 
 const getSortIndex = (sort: any) => sorts.value.findIndex((s) => s === sort)
 
+function onToggleSortEnabled(sort: any) {
+  if (blockToggleSort.value) {
+    showUpgradeToUseToggleSort({ triggerSource: 'toolbar-toggle-sort' })
+    return
+  }
+  sort.enabled = sort.enabled === false
+  $e('a:sort:toggle-enabled', { enabled: sort.enabled })
+  saveOrUpdate(sort, getSortIndex(sort))
+}
+
 watch(
   () => view?.value?.id,
   (viewId) => {
@@ -251,7 +265,16 @@ watch(
                 v-for="sort of displayedSorts"
                 :key="sort.id || sort.fk_column_id"
                 class="flex first:mb-0 !mb-1.5 !last:mb-0 items-center"
+                :class="{ 'nc-sort-disabled-row': sort.enabled === false }"
               >
+                <NcCheckbox
+                  v-if="appInfo.ee && !isPublic"
+                  :checked="sort.enabled !== false"
+                  size="default"
+                  :disabled="isLocked"
+                  class="nc-sort-enabled-checkbox xs:(flex min-h-8)"
+                  @change="onToggleSortEnabled(sort)"
+                />
                 <SmartsheetToolbarFieldListAutoCompleteDropdown
                   v-model="sort.fk_column_id"
                   class="flex caption nc-sort-field-select !w-44 flex-grow"
@@ -482,6 +505,13 @@ watch(
 :deep(.nc-sort-dir-select) {
   .ant-select-selector {
     @apply !rounded-none !border-nc-border-gray-medium !shadow-none;
+  }
+}
+
+.nc-sort-disabled-row {
+  .nc-sort-field-select,
+  .nc-sort-dir-select {
+    @apply opacity-40 pointer-events-none;
   }
 }
 </style>
