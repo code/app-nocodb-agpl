@@ -371,12 +371,13 @@ const calculateSlices = () => {
   rowSlice.end = Math.min(childrenCachedTotalRows.value, endIndex + ROW_VIRTUAL_MARGIN)
 }
 
-// Recalculate slices when totalRows changes (e.g., after first chunk load). Run again on the
-// next tick so the just-rendered scroll container gets measured (fixes empty persisted list
-// on first open when buffered pending links render the container before data arrives).
-watch(childrenCachedTotalRows, () => {
-  calculateSlices()
-  nextTick(calculateSlices)
+// Recompute the virtual slice whenever the total OR the set of cached rows changes — e.g.
+// after the first chunk loads, or when the list remounts on returning from the link-records
+// modal. `flush: 'post'` runs the callback after the DOM updates so the scroll container is
+// already mounted and measured; without it the persisted list computes an empty slice on
+// remount and only renders the already-linked rows once the user scrolls (#14058 review).
+watch([childrenCachedTotalRows, () => childrenCachedRows.value.size], () => calculateSlices(), {
+  flush: 'post',
 })
 
 const updateVisibleChunks = () => {
