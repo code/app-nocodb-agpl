@@ -636,7 +636,7 @@ const { handleSearchKeydown: handleKeyDown } = useLTARListKeyNav({
                 new: true,
               },
         }"
-        :state="newRowState"
+        :state="isNewRecord ? newRowState : {}"
         :row-id="extractPkFromRow(expandedFormRow, relatedTableMeta.columns as ColumnType[])"
         use-meta-fields
         skip-reload

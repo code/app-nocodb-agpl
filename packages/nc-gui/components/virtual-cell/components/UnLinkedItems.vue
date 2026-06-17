@@ -649,7 +649,7 @@ const { handleSearchKeydown: handleKeyDown } = useLTARListKeyNav({
               },
         }"
         :row-id="extractPkFromRow(expandedFormRow, relatedTableMeta.columns as ColumnType[])"
-        :state="newRowState"
+        :state="isNewRecord ? newRowState : {}"
         :blueprint-mode="isBlueprintMode"
         :breadcrumbs="isBlueprintMode ? [...parentBreadcrumbs, meta?.title || ''] : undefined"
         use-meta-fields
