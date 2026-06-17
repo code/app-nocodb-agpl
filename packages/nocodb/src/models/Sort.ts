@@ -234,6 +234,7 @@ export default class Sort {
       'fk_column_id',
       'direction',
       'enabled',
+      'order',
     ]);
 
     // set meta

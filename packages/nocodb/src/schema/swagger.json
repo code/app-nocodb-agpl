@@ -28124,6 +28124,11 @@
             "type": "boolean",
             "description": "Whether this sort is enabled. Disabled sorts are skipped during evaluation.",
             "nullable": true
+          },
+          "order": {
+            "type": "number",
+            "description": "The order in which the sort is applied relative to other sorts on the view.",
+            "nullable": true
           }
         },
         "x-stoplight": {

@@ -69,6 +69,7 @@ export function useViewSorts(view: Ref<ViewType | undefined>, reloadData?: () =>
             ? { fk_level_id: (sort as { fk_level_id?: string | null }).fk_level_id }
             : {}),
           ...(sort.enabled !== undefined ? { enabled: sort.enabled } : {}),
+          ...(sort.order !== undefined ? { order: sort.order } : {}),
         }
         if (sort.id) {
           await $api.internal.postOperation(
