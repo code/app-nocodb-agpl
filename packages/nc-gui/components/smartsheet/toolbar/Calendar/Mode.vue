@@ -19,7 +19,7 @@ const isTab = computed(() => props.tab)
 
 const dropdownOpen = ref(false)
 
-const highlightStyle = ref({ left: '0px' })
+const highlightStyle = ref<{ left: string; width?: string }>({ left: '0px' })
 
 const setActiveCalendarMode = (mode: 'day' | '3day' | 'week' | '2week' | 'month' | '6week' | 'year', event: MouseEvent) => {
   changeCalendarView(mode)
@@ -151,6 +151,7 @@ watch(activeCalendarView, () => {
           v-for="option in modes"
           :key="option"
           :data-testid="`nc-calendar-view-mode-option-${option}`"
+          inner-class="w-full"
           @click="changeCalendarView(option)"
         >
           <div class="flex-1 text-[13px]">{{ $t(modeI18nKey(option)) }}</div>
@@ -158,7 +159,7 @@ watch(activeCalendarView, () => {
             v-if="option === activeCalendarView"
             id="nc-selected-item-icon"
             icon="check"
-            class="flex-none text-primary w-4 h-4"
+            class="flex-none text-nc-content-brand w-4 h-4"
           />
         </NcMenuItem>
 
@@ -168,6 +169,7 @@ watch(activeCalendarView, () => {
             v-for="opt in weekendOptions"
             :key="opt.value"
             :data-testid="`nc-calendar-weekend-${opt.value}`"
+            inner-class="w-full"
             @click="setWeekendDisplay(opt.value)"
           >
             <div class="flex-1 text-[13px]">{{ opt.label }}</div>
@@ -175,7 +177,7 @@ watch(activeCalendarView, () => {
               v-if="weekendDisplay === opt.value"
               id="nc-selected-item-icon"
               icon="check"
-              class="flex-none text-primary w-4 h-4"
+              class="flex-none text-nc-content-brand w-4 h-4"
             />
           </NcMenuItem>
         </template>
