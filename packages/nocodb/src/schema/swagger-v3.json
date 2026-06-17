@@ -9404,6 +9404,11 @@
               "desc"
             ],
             "description": "Sorting direction, either 'asc' (ascending) or 'desc' (descending)."
+          },
+          "enabled": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "Whether this sort is enabled. Disabled sorts are skipped during evaluation."
           }
         },
         "required": [

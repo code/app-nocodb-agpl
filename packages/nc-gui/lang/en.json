@@ -187,6 +187,8 @@
     "upgradeToUseToggleFilterSubtitle": "Upgrade to the {plan} plan to enable or disable individual filters without removing them, giving you more control over your views.",
     "upgradeToUseToggleGroupBy": "Upgrade to toggle individual group-bys",
     "upgradeToUseToggleGroupBySubtitle": "Upgrade to the {plan} plan to enable or disable individual group-bys without removing them, giving you more control over your views.",
+    "upgradeToUseToggleSort": "Upgrade to toggle individual sorts",
+    "upgradeToUseToggleSortSubtitle": "Upgrade to the {plan} plan to enable or disable individual sorts without removing them, giving you more control over your views.",
     "upgradeToUsePinnedFilter": "Upgrade to pin filters to toolbar",
     "upgradeToUsePinnedFilterSubtitle": "Upgrade to the {plan} plan to pin frequently used filters to the toolbar for quick, one-click access.",
     "upgradeToUseCellColoring": "Upgrade to use cell colouring",

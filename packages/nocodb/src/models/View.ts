@@ -640,6 +640,7 @@ export default class View implements ViewType {
             'base_id',
             'source_id',
             'order',
+            'enabled',
           ]);
           if (sortProps.fk_level_id) {
             sortProps.fk_level_id =
@@ -3314,6 +3315,7 @@ export default class View implements ViewType {
             'direction',
             'base_id',
             'source_id',
+            'enabled',
           ]);
           if (sortProps.fk_level_id) {
             sortProps.fk_level_id =

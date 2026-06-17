@@ -30,6 +30,10 @@ export default async function sortV2(
 
   for (const _sort of sortList) {
     const sort = _sort instanceof Sort ? _sort : new Sort(_sort);
+
+    // skip disabled sorts (enabled === false or enabled === 0)
+    if (sort.enabled === false || (sort.enabled as any) === 0) continue;
+
     const column = await getRefColumnIfAlias(
       context,
       await sort.getColumn(context),

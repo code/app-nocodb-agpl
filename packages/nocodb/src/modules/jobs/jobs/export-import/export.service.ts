@@ -468,6 +468,7 @@ export class ExportService {
             const tempSr = {
               fk_column_id: idMap.get(sr.fk_column_id),
               direction: sr.direction,
+              enabled: sr.enabled,
             };
             export_sorts.push(tempSr);
           }
