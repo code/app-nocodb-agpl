@@ -132,6 +132,9 @@ interface Row {
     changed?: boolean
     saving?: boolean
     ltarState?: Record<string, Record<string, any> | Record<string, any>[] | null>
+    // Buffered unlinks for an existing record edited in the expanded form (#14013),
+    // persisted on save alongside ltarState (buffered links).
+    ltarRemoveState?: Record<string, Record<string, any> | Record<string, any>[] | null>
     fromExpandedForm?: boolean
     // Row is hidden by RLS policy after insert
     isRlsHidden?: boolean

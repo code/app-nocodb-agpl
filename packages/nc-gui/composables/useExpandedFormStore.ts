@@ -387,24 +387,35 @@ const [useProvideExpandedFormStore, useExpandedFormStore] = useInjectionState(
           return obj
         }, {} as Record<string, any>)
 
-        if (Object.keys(updateOrInsertObj).length) {
+        // Relational fields buffer their changes (#14013) and are persisted here on
+        // save, not on each link/unlink. A record can be "modified" via links alone.
+        const hasLtarChanges = rowStore.hasLtarChanges.value
+
+        if (Object.keys(updateOrInsertObj).length || hasLtarChanges) {
           const id = extractPkFromRow(row.value.row, meta.value.columns as ColumnType[])
 
           if (!id) {
             return message.info(t('msg.info.updateNotAllowedWithoutPK'))
           }
 
-          const updatedData = await $api.dbTableRow.update(
-            NOCO,
-            meta.value.base_id ?? (base.value.id as string),
-            meta.value.id,
-            encodeURIComponent(id),
-            updateOrInsertObj,
-          )
+          if (Object.keys(updateOrInsertObj).length) {
+            const updatedData = await $api.dbTableRow.update(
+              NOCO,
+              meta.value.base_id ?? (base.value.id as string),
+              meta.value.id,
+              encodeURIComponent(id),
+              updateOrInsertObj,
+            )
 
-          // If the updated row is now hidden by RLS policy, mark it
-          if (updatedData?.__nc_rls_hidden) {
-            row.value.row.__nc_rls_hidden = true
+            // If the updated row is now hidden by RLS policy, mark it
+            if (updatedData?.__nc_rls_hidden) {
+              row.value.row.__nc_rls_hidden = true
+            }
+          }
+
+          // Persist buffered link/unlink changes after the row update.
+          if (hasLtarChanges) {
+            await rowStore.syncLTARRefs(row.value.row)
           }
 
           if (commentsDrawer.value) {
@@ -879,6 +890,7 @@ const [useProvideExpandedFormStore, useExpandedFormStore] = useInjectionState(
       isSaving,
       formatSaveError,
       changedColumns,
+      hasLtarChanges: rowStore.hasLtarChanges,
       localOnlyChanges,
       loadRow,
       primaryKey,

@@ -32,7 +32,18 @@ const [useProvideSmartsheetRowStore, useSmartsheetRowStore] = useInjectionState(
       return row.row[column?.title]
     })
 
-    const { addLTARRef, removeLTARRef, syncLTARRefs, loadRow, clearLTARCell, cleaMMCell } = useSmartsheetLtarHelpersOrThrow()
+    const { addLTARRef, removeLTARRef, addLTARRemoveRef, removeLTARRemoveRef, syncLTARRefs, loadRow, clearLTARCell, cleaMMCell } =
+      useSmartsheetLtarHelpersOrThrow()
+
+    // True when the row has buffered link/unlink changes not yet persisted.
+    // Drives the expanded form's "modified" state for relational fields.
+    const hasLtarChanges = computed(() => {
+      const ltarState = currentRow.value?.rowMeta?.ltarState ?? {}
+      const ltarRemoveState = currentRow.value?.rowMeta?.ltarRemoveState ?? {}
+      const hasEntries = (s: Record<string, any>) =>
+        Object.values(s).some((v) => (Array.isArray(v) ? v.length > 0 : !!v))
+      return hasEntries(ltarState) || hasEntries(ltarRemoveState)
+    })
 
     return {
       pk,
@@ -40,6 +51,7 @@ const [useProvideSmartsheetRowStore, useSmartsheetRowStore] = useInjectionState(
       changedColumns,
       state,
       isNew,
+      hasLtarChanges,
       displayValue,
       // todo: use better name
       addLTARRef: async (...args: any) => {
@@ -49,6 +61,14 @@ const [useProvideSmartsheetRowStore, useSmartsheetRowStore] = useInjectionState(
       },
       removeLTARRef: async (...args: any) => {
         await removeLTARRef(currentRow.value, ...args)
+        triggerRef(currentRow as Ref)
+      },
+      addLTARRemoveRef: async (...args: any) => {
+        await addLTARRemoveRef(currentRow.value, ...args)
+        triggerRef(currentRow as Ref)
+      },
+      removeLTARRemoveRef: async (...args: any) => {
+        await removeLTARRemoveRef(currentRow.value, ...args)
         triggerRef(currentRow as Ref)
       },
       syncLTARRefs: (...args: any) => syncLTARRefs(currentRow.value, ...args),

@@ -52,6 +52,10 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
 
     const isForm = inject(IsFormInj, ref(false))
 
+    // True only when this store lives inside the Expand Record form subtree
+    // (component-tree scoped). Grid inline link cells get the default `false`.
+    const isExpandedFormOpen = inject(IsExpandedFormOpenInj, ref(false))
+
     const path = inject(GroupPathInj, ref([]))
 
     const sharedViewPassword = inject(SharedViewPasswordInj, ref(null))
@@ -160,6 +164,12 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
     })
 
     const rowId = computed(() => extractPkFromRow(currentRow.value?.row, meta.value?.columns))
+
+    // When true, link/unlink buffer the change locally and persist on save instead
+    // of hitting the API immediately. Holds for brand-new rows (no pk yet) and for
+    // existing rows edited inside the Expand Record form (#14013) — matching the
+    // buffered behavior of every other field type. Grid inline editing stays immediate.
+    const shouldDefer = computed(() => isNewRow?.value || !rowId.value || isExpandedFormOpen.value)
 
     const showExtraFields = computed(() => {
       return !isForm.value || !parseProp(column.value?.meta)?.[hideExtraFieldsMetaKey]
@@ -773,34 +783,82 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
     const smartsheetRowStore = useSmartsheetRowStore()
     const addLTARRef = smartsheetRowStore?.addLTARRef
     const removeLTARRef = smartsheetRowStore?.removeLTARRef
+    const addLTARRemoveRef = smartsheetRowStore?.addLTARRemoveRef
+    const removeLTARRemoveRef = smartsheetRowStore?.removeLTARRemoveRef
     const rowStoreCurrentRow = smartsheetRowStore?.currentRow
+
+    // Match buffered related rows by their primary key — the object shape from the
+    // linked list can differ from the one stored when linking, so deep-compare is unsafe.
+    const isSameRelatedRow = (a: Record<string, any>, b: Record<string, any>) =>
+      getRelatedTableRowId(a) === getRelatedTableRowId(b)
+
+    // Is the given related record already buffered as a pending link (ltarState)?
+    const isPendingLink = (relatedRow: Record<string, any>) => {
+      const buffered = currentRow.value?.rowMeta?.ltarState?.[column.value.title!]
+      if (!buffered) return false
+      if (Array.isArray(buffered)) {
+        return buffered.some((r: Record<string, any>) => isSameRelatedRow(r, relatedRow))
+      }
+      return isSameRelatedRow(buffered, relatedRow)
+    }
+
+    // Is the given related record already buffered as a pending unlink (ltarRemoveState)?
+    const isPendingUnlink = (relatedRow: Record<string, any>) => {
+      const buffered = currentRow.value?.rowMeta?.ltarRemoveState?.[column.value.title!]
+      if (!buffered) return false
+      if (Array.isArray(buffered)) {
+        return buffered.some((r: Record<string, any>) => isSameRelatedRow(r, relatedRow))
+      }
+      return isSameRelatedRow(buffered, relatedRow)
+    }
 
     const unlink = async (
       row: Record<string, any>,
       { metaValue = meta.value }: { metaValue?: TableType } = {},
       index: number, // Index is For Loading and Linked State of Row
     ) => {
-      // For new rows, remove from local state
-      if (isNewRow?.value || !rowId.value) {
+      // Defer the unlink (persist on save) for new rows and for existing rows edited
+      // inside the expanded form (#14013) — see `shouldDefer`.
+      if (shouldDefer.value) {
         if (!removeLTARRef || !rowStoreCurrentRow) {
-          console.warn('[useLTARStore]: unlink() called for new row without a row-store provider — ignoring')
+          console.warn('[useLTARStore]: unlink() called without a row-store provider — ignoring')
           return
         }
-        removeLTARRef(row, column.value as ColumnType)
-        const targetRow = rowStoreCurrentRow.value
-        if (isSingleTargetRelation.value) {
-          targetRow.row[column.value.title!] = null
+
+        if (isNewRow?.value || !rowId.value) {
+          // New row: links live entirely in local ltarState + row.row.
+          removeLTARRef(row, column.value as ColumnType)
+          const targetRow = rowStoreCurrentRow.value
+          if (isSingleTargetRelation.value) {
+            targetRow.row[column.value.title!] = null
+          } else {
+            const arr = targetRow.row[column.value.title!]
+            if (Array.isArray(arr)) {
+              const idx = arr.indexOf(row)
+              if (idx !== -1) arr.splice(idx, 1)
+            }
+          }
         } else {
-          const arr = targetRow.row[column.value.title!]
-          if (Array.isArray(arr)) {
-            const idx = arr.indexOf(row)
-            if (idx !== -1) arr.splice(idx, 1)
+          // Existing row in the expanded form: buffer the unlink (net-diff against any
+          // pending link) and mirror the immediate path's local UI updates. The actual
+          // nestedRemove runs on save via syncLTARRefs.
+          if (isPendingLink(row)) {
+            await removeLTARRef(row, column.value as ColumnType, { skipRowDisplay: true })
+          } else {
+            await addLTARRemoveRef?.(row, column.value as ColumnType)
+          }
+          if (isSingleTargetRelation.value) {
+            rowStoreCurrentRow.value.row[column.value.title!] = null
+          } else {
+            childrenListCount.value = Math.max(0, childrenListCount.value - 1)
           }
         }
+
         isChildrenExcludedListLinked.value[index] = false
         isChildrenListLinked.value[index] = false
         excludedLinkedState.value.set(index, false)
         childrenCachedLinkedState.value.set(index, false)
+        $e('a:links:unlink')
         return
       }
       try {
@@ -860,27 +918,58 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
       { metaValue = meta.value }: { metaValue?: TableType } = {},
       index: number, // Index is For Loading and Linked State of Row
     ) => {
-      // For new rows, store the link in local state — it will be persisted on save via nested insert
-      if (isNewRow?.value || !rowId.value) {
+      // Defer the link (persist on save) for new rows and for existing rows edited inside
+      // the expanded form (#14013) — see `shouldDefer`.
+      if (shouldDefer.value) {
         if (!addLTARRef || !rowStoreCurrentRow) {
-          console.warn('[useLTARStore]: link() called for new row without a row-store provider — ignoring')
+          console.warn('[useLTARStore]: link() called without a row-store provider — ignoring')
           return
         }
-        addLTARRef(row, column.value as ColumnType)
-        // Update the row store's currentRow (not the LTAR store's snapshot) so components re-render
-        const targetRow = rowStoreCurrentRow.value
-        if (isSingleTargetRelation.value) {
-          targetRow.row[column.value.title!] = row
-        } else {
-          if (!Array.isArray(targetRow.row[column.value.title!])) {
-            targetRow.row[column.value.title!] = []
+
+        if (isNewRow?.value || !rowId.value) {
+          // New row: buffered links drive the cell display via row.row.
+          await addLTARRef(row, column.value as ColumnType)
+          const targetRow = rowStoreCurrentRow.value
+          if (isSingleTargetRelation.value) {
+            targetRow.row[column.value.title!] = row
+          } else {
+            if (!Array.isArray(targetRow.row[column.value.title!])) {
+              targetRow.row[column.value.title!] = []
+            }
+            targetRow.row[column.value.title!].push(row)
           }
-          targetRow.row[column.value.title!].push(row)
+        } else {
+          // Existing row in the expanded form: buffer the link (net-diff against any
+          // pending unlink) and mirror the immediate path's local UI updates. The actual
+          // nestedAdd runs on save via syncLTARRefs.
+          if (isPendingUnlink(row)) {
+            await removeLTARRemoveRef?.(row, column.value as ColumnType)
+          } else {
+            await addLTARRef(row, column.value as ColumnType, { skipRowDisplay: true })
+          }
+          if (isSingleTargetRelation.value) {
+            rowStoreCurrentRow.value.row[column.value.title!] = row
+          } else {
+            childrenListCount.value = childrenListCount.value + 1
+          }
         }
+
         isChildrenExcludedListLinked.value[index] = true
         isChildrenListLinked.value[index] = true
         excludedLinkedState.value.set(index, true)
         childrenCachedLinkedState.value.set(index, true)
+
+        // Single-target: only the picked record stays linked in the excluded list.
+        if (isSingleTargetRelation.value) {
+          isChildrenExcludedListLinked.value = Array(childrenExcludedList.value?.list.length).fill(false)
+          isChildrenExcludedListLinked.value[index] = true
+          for (const [key] of excludedLinkedState.value) {
+            excludedLinkedState.value.set(key, false)
+          }
+          excludedLinkedState.value.set(index, true)
+        }
+
+        $e('a:links:link')
         return
       }
       try {
