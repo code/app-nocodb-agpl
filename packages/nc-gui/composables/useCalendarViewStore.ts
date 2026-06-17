@@ -71,6 +71,9 @@ const [useProvideCalendarViewStore, useCalendarViewStore] = useInjectionState(
     const viewMetaProperties = computed<{
       active_view: string
       hide_weekend: boolean
+      // When true, Sat & Sun stay visible but render in narrower columns so the
+      // weekdays get more space. Mutually exclusive with hide_weekend.
+      collapse_weekend: boolean
     }>(() => {
       let meta = calendarMetaData.value?.meta ?? {}
 
@@ -81,6 +84,7 @@ const [useProvideCalendarViewStore, useCalendarViewStore] = useInjectionState(
       return meta as {
         active_view: string
         hide_weekend: boolean
+        collapse_weekend: boolean
       }
     })
 
