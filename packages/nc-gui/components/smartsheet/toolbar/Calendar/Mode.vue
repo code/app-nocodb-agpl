@@ -9,6 +9,8 @@ const { changeCalendarView, activeCalendarView, viewMetaProperties } = useCalend
 
 const { updateViewMeta } = useViewsStore()
 
+const { $e } = useNuxtApp()
+
 const activeView = inject(ActiveViewInj, ref())
 
 const isLocked = inject(IsLockedInj, ref(false))
@@ -70,6 +72,8 @@ const weekendOptions = computed<{ value: WeekendDisplay; label: string }[]>(() =
 
 const setWeekendDisplay = (value: WeekendDisplay) => {
   if (isLocked.value) return
+
+  $e('c:calendar:weekend-display', { display: value })
 
   updateViewMeta(activeView.value?.id as string, ViewTypes.CALENDAR, {
     meta: {
