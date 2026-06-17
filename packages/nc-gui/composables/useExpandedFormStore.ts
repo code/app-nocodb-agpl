@@ -378,6 +378,10 @@ const [useProvideExpandedFormStore, useExpandedFormStore] = useInjectionState(
           rowMeta: {
             ...row.value.rowMeta,
             new: false,
+            // Links were persisted via the create payload — clear the buffers so the
+            // record is no longer flagged as having unsaved relational changes (#14013).
+            ltarState: {},
+            ltarRemoveState: {},
           },
           oldRow: { ...data },
         })
