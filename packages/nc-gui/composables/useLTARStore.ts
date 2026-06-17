@@ -878,14 +878,17 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
       }
 
       // Multi-target: keep the child-list count badge in sync, and preserve the cell
-      // value's SHAPE. V2 Links cells hold a numeric rollup count; V1 hm/mm cells hold an
-      // array of linked records (rendered as chips — ManyToMany.vue calls .reduce on it),
-      // so a bare count would break them.
+      // value's SHAPE — which is decided by the CELL RENDERER (uidt), not the link version.
+      // A `Links` cell renders a numeric rollup count; a `LinkToAnotherRecord` hm/mm cell
+      // renders an array of chips (ManyToMany/HasMany.vue call .reduce on it) even when the
+      // relation is version V2. Keying off `isLinkV2` (version) here wrote a bare count into a
+      // LinkToAnotherRecord cell, so `localCellValue` fell back to [] and the cell appeared to
+      // clear on every deferred edit until save (#14013).
       const persistedCount = Array.isArray(base) ? base.length : +(base ?? 0) || 0
       const count = resolveDeferredLtarCount(queue, colId, persistedCount)
       childrenListCount.value = count
 
-      if (isLinkV2(column.value)) {
+      if (column.value.uidt === UITypes.Links) {
         cur.row[colTitle] = count
       } else {
         const unlinkIds = new Set(
