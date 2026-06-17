@@ -70,6 +70,9 @@ const {
   fetchExcludedChunk,
   clearExcludedCache,
   resetExcludedCache,
+  shouldDefer,
+  isPendingLink,
+  isPendingUnlink,
 } = useLTARStoreOrThrow()
 
 const { addLTARRef, isNew, removeLTARRef, state: rowState } = useSmartsheetRowStoreOrThrow()
@@ -374,9 +377,15 @@ const visibleRows = computed(() => {
   return Array.from({ length: Math.max(0, end - start) }, (_, i) => {
     const idx = start + i
     const row = excludedCachedRows.value.get(idx)
-    const isLinked = excludedLinkedState.value.get(idx) ?? false
+    let isLinked = excludedLinkedState.value.get(idx) ?? false
     const isLoading = excludedLoadingState.value.get(idx) ?? false
     if (!row) return { _placeholder: true, _index: idx, _isLinked: false, _isLoading: false }
+    // Reflect buffered (deferred, unsaved) link/unlink so the picker's link
+    // markers don't revert to the persisted state when the modal is reopened.
+    if (shouldDefer.value && !isNew.value) {
+      if (isPendingLink(row)) isLinked = true
+      else if (isPendingUnlink(row)) isLinked = false
+    }
     return { ...row, _index: idx, _isLinked: isLinked, _isLoading: isLoading }
   })
 })

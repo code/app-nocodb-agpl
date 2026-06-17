@@ -725,7 +725,17 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
         }
 
         if (!childrenListPagination.query) {
-          childrenListCount.value = childrenList.value?.pageInfo.totalRows ?? 0
+          let total = childrenList.value?.pageInfo.totalRows ?? 0
+          // Account for buffered (deferred, unsaved) link/unlink so the count
+          // doesn't revert to the persisted total when the modal is reopened.
+          if (shouldDefer.value && !isNewRow?.value && rowId.value) {
+            const links = currentRow.value?.rowMeta?.ltarState?.[column.value?.title as string]
+            const unlinks = currentRow.value?.rowMeta?.ltarRemoveState?.[column.value?.title as string]
+            const nLinks = Array.isArray(links) ? links.length : links ? 1 : 0
+            const nUnlinks = Array.isArray(unlinks) ? unlinks.length : unlinks ? 1 : 0
+            total = Math.max(0, total + nLinks - nUnlinks)
+          }
+          childrenListCount.value = total
         }
 
         // Seed the virtual-scroll chunk cache from this response. pagination.size is
@@ -1447,6 +1457,7 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
       isSingleTargetRelation,
       pendingLinkRows,
       removePendingLink,
+      isPendingLink,
       isPendingUnlink,
     }
   },

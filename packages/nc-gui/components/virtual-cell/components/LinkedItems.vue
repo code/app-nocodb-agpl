@@ -94,6 +94,7 @@ const {
   isSingleTargetRelation,
   pendingLinkRows,
   removePendingLink,
+  isPendingUnlink,
 } = useLTARStoreOrThrow()
 
 const { withLoading } = useLoadingTrigger()
@@ -399,9 +400,12 @@ const visibleRows = computed(() => {
   return Array.from({ length: Math.max(0, end - start) }, (_, i) => {
     const idx = start + i
     const row = childrenCachedRows.value.get(idx)
-    const isLinked = childrenCachedLinkedState.value.get(idx) ?? true
+    let isLinked = childrenCachedLinkedState.value.get(idx) ?? true
     const isLoading = childrenCachedLoadingState.value.get(idx) ?? false
     if (!row) return { _placeholder: true, _index: idx, _isLinked: true, _isLoading: false }
+    // A persisted row buffered for unlink (deferred) must render as unlinked
+    // even after the cache reseeds on reopen / far-chunk load.
+    if (shouldDefer.value && !isNew.value && isPendingUnlink(row)) isLinked = false
     return { ...row, _index: idx, _isLinked: isLinked, _isLoading: isLoading }
   })
 })
