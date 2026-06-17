@@ -22,19 +22,6 @@ const [useProvideSmartsheetLtarHelpers, useSmartsheetLtarHelpers] = useInjection
       return row.rowMeta.ltarState
     }
 
-    // Pending unlinks buffered for an existing record edited in the expanded form.
-    // Mirrors `ltarState` (pending links) but holds links to remove on save. Only
-    // relevant for existing rows — new rows have nothing persisted to remove.
-    const getRowLtarRemoveState = (row: Row) => {
-      if (!row.rowMeta) {
-        row.rowMeta = {}
-      }
-      if (!row.rowMeta.ltarRemoveState) {
-        row.rowMeta.ltarRemoveState = {}
-      }
-      return row.rowMeta.ltarRemoveState
-    }
-
     // actions
     // `skipRowDisplay` keeps `row.row` untouched — used for existing records edited in
     // the expanded form, where the visible links come from the API-loaded children list,
@@ -82,136 +69,6 @@ const [useProvideSmartsheetLtarHelpers, useSmartsheetLtarHelpers] = useInjection
         const idx = getRowLtarHelpers(row)[column.title!]?.findIndex((ln: Record<string, any>) => deepCompare(ln, value)) ?? -1
         if (idx !== -1) getRowLtarHelpers(row)[column.title!]?.splice(idx, 1)
         if (!skipRowDisplay) row.row[column.title!] = [...(getRowLtarHelpers(row)[column.title!] || [])]
-      }
-    }
-
-    // Buffer a link removal (existing-row unlink deferred until save).
-    const addLTARRemoveRef = async (row: Row, value: Record<string, any>, column: ColumnType) => {
-      if (isBtLikeV2Junction(column) || isBt(column) || isOo(column)) {
-        getRowLtarRemoveState(row)[column.title!] = value
-      } else if (isHm(column) || isMm(column) || isMMOrMMLike(column)) {
-        if (!getRowLtarRemoveState(row)[column.title!]) getRowLtarRemoveState(row)[column.title!] = []
-        const list = getRowLtarRemoveState(row)[column.title!]!
-        if (!list.find((ln: Record<string, any>) => deepCompare(ln, value))) list.push(value)
-      }
-    }
-
-    // Cancel a buffered link removal (re-linking something queued for unlink).
-    const removeLTARRemoveRef = async (row: Row, value: Record<string, any>, column: ColumnType) => {
-      const removeState = getRowLtarRemoveState(row)
-      if (isBtLikeV2Junction(column) || isBt(column) || isOo(column)) {
-        removeState[column.title!] = null
-      } else if (isHm(column) || isMm(column) || isMMOrMMLike(column)) {
-        const idx = removeState[column.title!]?.findIndex((ln: Record<string, any>) => deepCompare(ln, value)) ?? -1
-        if (idx !== -1) removeState[column.title!]!.splice(idx, 1)
-      }
-    }
-
-    const linkRecord = async (
-      rowId: string,
-      relatedRowId: string,
-      column: ColumnType,
-      type: RelationTypes,
-      { metaValue = meta.value }: { metaValue?: TableType } = {},
-    ) => {
-      try {
-        await $api.dbTableRow.nestedAdd(
-          NOCO,
-          metaValue?.base_id ?? (base.value.id as string),
-          metaValue?.id as string,
-          encodeURIComponent(rowId),
-          type,
-          column.id as string,
-          encodeURIComponent(relatedRowId),
-        )
-      } catch (e: any) {
-        message.error(await extractSdkResponseErrorMsg(e))
-      }
-    }
-
-    const unlinkRecord = async (
-      rowId: string,
-      relatedRowId: string,
-      column: ColumnType,
-      type: RelationTypes,
-      { metaValue = meta.value }: { metaValue?: TableType } = {},
-    ) => {
-      try {
-        await $api.dbTableRow.nestedRemove(
-          NOCO,
-          metaValue?.base_id ?? (base.value.id as string),
-          metaValue?.id as string,
-          encodeURIComponent(rowId),
-          type,
-          column.id as string,
-          encodeURIComponent(relatedRowId),
-        )
-      } catch (e: any) {
-        message.error(await extractSdkResponseErrorMsg(e))
-      }
-    }
-
-    /** sync LTAR relations kept in local state */
-    const syncLTARRefs = async (
-      row: Row,
-      rowData: Record<string, any>,
-      { metaValue = meta.value }: { metaValue?: TableType } = {},
-    ) => {
-      const id = extractPkFromRow(rowData, metaValue?.columns as ColumnType[])
-      for (const column of metaValue?.columns ?? []) {
-        if (!isLinksOrLTAR(column)) continue
-
-        const colOptions = column.colOptions as LinkToAnotherRecordType
-
-        const relatedBaseId = (colOptions as any)?.fk_related_base_id || metaValue?.base_id
-        const relatedTableMeta = getMetaByKey(relatedBaseId, colOptions?.fk_related_model_id as string)
-
-        if (isBtLikeV2Junction(column) || isBt(column) || isOo(column)) {
-          // V2 MO/OO and V1 BT/OO — single-record link
-          if (getRowLtarHelpers(row)?.[column.title!]) {
-            await linkRecord(
-              id,
-              extractPkFromRow(
-                getRowLtarHelpers(row)?.[column.title!] as Record<string, any>,
-                relatedTableMeta.columns as ColumnType[],
-              ),
-              column,
-              colOptions.type as RelationTypes,
-              { metaValue },
-            )
-          }
-        } else if (isHm(column) || isMm(column) || isMMOrMMLike(column)) {
-          const relatedRows = (getRowLtarHelpers(row)?.[column.title!] ?? []) as Record<string, any>[]
-
-          for (const relatedRow of relatedRows) {
-            await linkRecord(
-              id,
-              extractPkFromRow(relatedRow, relatedTableMeta.columns as ColumnType[]),
-              column,
-              colOptions.type as RelationTypes,
-              { metaValue },
-            )
-          }
-        }
-
-        // Replay buffered unlinks (existing record edited in the expanded form).
-        const removeState = getRowLtarRemoveState(row)?.[column.title!]
-        if (removeState) {
-          const rowsToRemove = (Array.isArray(removeState) ? removeState : [removeState]).filter(Boolean)
-          for (const relatedRow of rowsToRemove) {
-            await unlinkRecord(
-              id,
-              extractPkFromRow(relatedRow, relatedTableMeta.columns as ColumnType[]),
-              column,
-              colOptions.type as RelationTypes,
-              { metaValue },
-            )
-          }
-        }
-
-        // clear LTAR refs after sync
-        getRowLtarHelpers(row)[column.title!] = null
-        getRowLtarRemoveState(row)[column.title!] = null
       }
     }
 
@@ -319,9 +176,6 @@ const [useProvideSmartsheetLtarHelpers, useSmartsheetLtarHelpers] = useInjection
     return {
       addLTARRef,
       removeLTARRef,
-      addLTARRemoveRef,
-      removeLTARRemoveRef,
-      syncLTARRefs,
       loadRow,
       clearLTARCell,
       cleaMMCell,

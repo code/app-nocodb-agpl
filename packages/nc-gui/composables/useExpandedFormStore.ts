@@ -339,6 +339,39 @@ const [useProvideExpandedFormStore, useExpandedFormStore] = useInjectionState(
       return $state.user?.value?.email === email
     }
 
+    // Replay queued relation (LTAR) edits for an existing record on save, using the nested
+    // link/unlink API — the deferred counterpart of useLTARStore's immediate calls (#14013/#14058).
+    // Drained one-by-one so a mid-way failure leaves the rest queued (and the record dirty) for
+    // retry, while already-applied ops are not re-sent.
+    const applyPendingLtarOps = async () => {
+      const queue = rowStore.pendingLtarOps
+      while (queue.value.length) {
+        const op = queue.value[0]
+        if (op.op === 'link') {
+          await $api.dbTableRow.nestedAdd(
+            NOCO,
+            op.baseId,
+            op.tableId,
+            encodeURIComponent(op.rowId),
+            op.type,
+            op.columnId,
+            encodeURIComponent(op.relatedRowId),
+          )
+        } else {
+          await $api.dbTableRow.nestedRemove(
+            NOCO,
+            op.baseId,
+            op.tableId,
+            encodeURIComponent(op.rowId),
+            op.type,
+            op.columnId,
+            encodeURIComponent(op.relatedRowId),
+          )
+        }
+        queue.value.shift()
+      }
+    }
+
     const save = async (
       ltarState: Record<string, any> = {},
       // TODO: Hack. Remove this when kanban injection store issue is resolved
@@ -378,10 +411,9 @@ const [useProvideExpandedFormStore, useExpandedFormStore] = useInjectionState(
           rowMeta: {
             ...row.value.rowMeta,
             new: false,
-            // Links were persisted via the create payload — clear the buffers so the
+            // Links were persisted via the create payload — clear the buffer so the
             // record is no longer flagged as having unsaved relational changes (#14013).
             ltarState: {},
-            ltarRemoveState: {},
           },
           oldRow: { ...data },
         })
@@ -391,7 +423,7 @@ const [useProvideExpandedFormStore, useExpandedFormStore] = useInjectionState(
           return obj
         }, {} as Record<string, any>)
 
-        // Relational fields buffer their changes (#14013) and are persisted here on
+        // Relational fields queue their changes (#14013/#14058) and are persisted here on
         // save, not on each link/unlink. A record can be "modified" via links alone.
         const hasLtarChanges = rowStore.hasLtarChanges.value
 
@@ -417,9 +449,9 @@ const [useProvideExpandedFormStore, useExpandedFormStore] = useInjectionState(
             }
           }
 
-          // Persist buffered link/unlink changes after the row update.
+          // Persist queued link/unlink changes after the row update.
           if (hasLtarChanges) {
-            await rowStore.syncLTARRefs(row.value.row)
+            await applyPendingLtarOps()
           }
 
           if (commentsDrawer.value) {
@@ -895,6 +927,7 @@ const [useProvideExpandedFormStore, useExpandedFormStore] = useInjectionState(
       formatSaveError,
       changedColumns,
       hasLtarChanges: rowStore.hasLtarChanges,
+      pendingLtarOps: rowStore.pendingLtarOps,
       localOnlyChanges,
       loadRow,
       primaryKey,

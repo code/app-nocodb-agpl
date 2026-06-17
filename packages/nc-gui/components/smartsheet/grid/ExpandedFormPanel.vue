@@ -122,6 +122,7 @@ const {
   commentsDrawer,
   changedColumns,
   hasLtarChanges,
+  pendingLtarOps,
   displayValue,
   state: rowState,
   isNew,
@@ -338,12 +339,13 @@ watch(showDiscardModal, (v) => {
 const discardAndNavigate = () => {
   $e('c:row-expand-panel:discard')
   clearColumns()
-  // Drop buffered link/unlink changes too, so a discarded deferred LTAR edit
-  // doesn't leak into the next record or a re-open.
+  // Drop deferred link/unlink changes too, so a discarded edit doesn't leak into the
+  // next record or a re-open. New-row links live on rowMeta; existing-row edits in the
+  // pendingLtarOps queue (#14058).
   if (_row.value?.rowMeta) {
     _row.value.rowMeta.ltarState = {}
-    _row.value.rowMeta.ltarRemoveState = {}
   }
+  pendingLtarOps.value = []
   showDiscardModal.value = false
   runPending()
 }

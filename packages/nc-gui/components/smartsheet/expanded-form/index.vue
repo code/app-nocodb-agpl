@@ -146,6 +146,7 @@ const {
   commentsDrawer,
   changedColumns,
   hasLtarChanges,
+  pendingLtarOps,
   displayValue,
   state: rowState,
   isNew,
@@ -426,10 +427,12 @@ const interruptedDirectionToGo = ref<'next' | 'prev' | undefined>(undefined)
 
 // Drop buffered link/unlink changes so they don't leak to the next record or a re-open.
 const clearLtarBuffers = () => {
+  // New-row buffered links live on rowMeta; existing-row deferred edits live in the
+  // pendingLtarOps queue (#14058). Drop both so a discarded edit can't leak.
   if (_row.value?.rowMeta) {
     _row.value.rowMeta.ltarState = {}
-    _row.value.rowMeta.ltarRemoveState = {}
   }
+  pendingLtarOps.value = []
 }
 
 const discardPreventModal = () => {
