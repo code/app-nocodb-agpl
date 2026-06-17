@@ -179,7 +179,10 @@ function onToggleSortEnabled(sort: any) {
   saveOrUpdate(sort, getSortIndex(sort))
 }
 
-// Reorder sorts via drag-drop — mirrors the group-by reorder behaviour.
+// Reorder sorts via drag-drop. Reposition ONLY the moved sort with a fractional
+// `order` between its new neighbours (the column is a float) — mirrors table
+// reorder. One sort changes → one sortUpdate → a single undo reverts the whole
+// drag. Renumbering every row 1..N instead would fire N updates → N undo steps.
 async function onSortMove(event: { moved?: { newIndex: number; oldIndex: number } }) {
   if (!event?.moved) return
 
@@ -192,15 +195,18 @@ async function onSortMove(event: { moved?: { newIndex: number; oldIndex: number 
   if (!moved) return
   reordered.splice(newIndex, 0, moved)
 
-  // Assign 1-based order to the reordered subset, tracking which actually changed
-  const changed: typeof reordered = []
-  reordered.forEach((sort, idx) => {
-    const order = idx + 1
-    if (sort.order !== order) {
-      sort.order = order
-      changed.push(sort)
-    }
-  })
+  // Place the moved sort between its new neighbours without touching the rest.
+  const prevOrder = reordered[newIndex - 1]?.order
+  const nextOrder = reordered[newIndex + 1]?.order
+  if (prevOrder != null && nextOrder != null) {
+    moved.order = (prevOrder + nextOrder) / 2
+  } else if (prevOrder != null) {
+    moved.order = prevOrder + 1
+  } else if (nextOrder != null) {
+    moved.order = nextOrder / 2
+  } else {
+    moved.order = 1
+  }
 
   // Reflect the new order in the store array so the list re-renders immediately.
   // For level-filtered list views, splice the reordered subset back into the
@@ -216,9 +222,7 @@ async function onSortMove(event: { moved?: { newIndex: number; oldIndex: number 
 
   $e('a:sort:reorder')
 
-  for (const sort of changed) {
-    await saveOrUpdate(sort, getSortIndex(sort))
-  }
+  await saveOrUpdate(moved, getSortIndex(moved))
 }
 
 watch(

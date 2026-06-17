@@ -200,16 +200,26 @@ export function useViewSorts(view: Ref<ViewType | undefined>, reloadData?: () =>
     $e('a:sort:add', { length: sorts?.value?.length })
   }
 
+  // Keep the list ordered by `order` — a realtime reorder (incl. undo/redo,
+  // which only changes the `order` field) must re-sort, otherwise the visible
+  // order stays stale until a reload.
+  const sortByOrder = (list: SortType[]) =>
+    [...list].sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity))
+
   const evtListener = (evt: string, payload: any) => {
     if (payload.fk_view_id !== view.value?.id) return
 
     if (evt === 'sort_create') {
-      sorts.value.push(payload)
+      if (!sorts.value.some((s) => s.id === payload.id)) {
+        sorts.value = sortByOrder([...sorts.value, payload])
+      }
       reloadHook?.trigger()
     } else if (evt === 'sort_update') {
       const index = sorts.value.findIndex((s) => s.id === payload.id)
       if (index !== -1) {
-        sorts.value[index] = payload
+        const next = [...sorts.value]
+        next[index] = payload
+        sorts.value = sortByOrder(next)
       }
       reloadHook?.trigger()
     } else if (evt === 'sort_delete') {
