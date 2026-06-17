@@ -11,7 +11,6 @@ import { describe, expect, it } from 'vitest'
 import { RelationTypes } from 'nocodb-sdk'
 import {
   type PendingLtarOp,
-  columnHasPendingLtarOps,
   reconcilePendingLtarOp,
   resolveDeferredLtarCount,
   resolveDeferredSingleTargetValue,
@@ -77,19 +76,6 @@ describe('reconcilePendingLtarOp', () => {
   it('keeps same record on different columns independent', () => {
     const q = queueWith(makeOp('unlink', '1', { columnId: 'colA' }), makeOp('link', '1', { columnId: 'colB' }))
     expect(q).toHaveLength(2)
-  })
-})
-
-// ---- columnHasPendingLtarOps ----
-
-describe('columnHasPendingLtarOps', () => {
-  it('is true while the column has queued ops and false once they cancel out', () => {
-    const q = queueWith(makeOp('unlink', '1', { columnId: 'colA' }))
-    expect(columnHasPendingLtarOps(q, 'colA')).toBe(true)
-    expect(columnHasPendingLtarOps(q, 'colB')).toBe(false)
-
-    reconcilePendingLtarOp(q, makeOp('link', '1', { columnId: 'colA' }))
-    expect(columnHasPendingLtarOps(q, 'colA')).toBe(false)
   })
 })
 
@@ -163,6 +149,5 @@ describe('queue scenarios', () => {
   it('add-then-remove of the same record is a no-op (no API call, not dirty)', () => {
     const q = queueWith(makeOp('link', 'X'), makeOp('unlink', 'X'))
     expect(q).toHaveLength(0)
-    expect(columnHasPendingLtarOps(q, 'col_links')).toBe(false)
   })
 })

@@ -52,15 +52,12 @@ export function reconcilePendingLtarOp(queue: PendingLtarOp[], next: PendingLtar
     return queue
   }
 
-  const isDuplicate = queue.some((o) => o.op === next.op && o.columnId === next.columnId && o.relatedRowId === next.relatedRowId)
+  const isDuplicate = queue.some(
+    (o) => o.op === next.op && o.columnId === next.columnId && o.relatedRowId === next.relatedRowId,
+  )
   if (!isDuplicate) queue.push(next)
 
   return queue
-}
-
-/** Whether the given column still has any queued operation (drives dirty-state). */
-export function columnHasPendingLtarOps(queue: PendingLtarOp[], columnId: string): boolean {
-  return queue.some((o) => o.columnId === columnId)
 }
 
 /**

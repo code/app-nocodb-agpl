@@ -354,21 +354,29 @@ const ROW_VIRTUAL_MARGIN = 5
 const rowSlice = reactive({ start: 0, end: 0 })
 
 const calculateSlices = () => {
-  const container = scrollContainerRef.value
-  if (!container || childrenCachedTotalRows.value === 0) return
+  if (childrenCachedTotalRows.value === 0) return
 
-  const scrollTop = container.scrollTop
+  const container = scrollContainerRef.value
+  const scrollTop = container?.scrollTop ?? 0
+  // Fall back to a sensible viewport height when the scroll container isn't measured yet
+  // (e.g. first open with buffered pending links, before the DOM flush binds the ref).
+  // Without this the persisted list would compute an empty slice and only render after a
+  // scroll / reopen, hiding already-linked records on first open. (#14058 review)
+  const clientHeight = container?.clientHeight || 12 * ROW_HEIGHT
   const startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT))
-  const visibleCount = Math.ceil(container.clientHeight / ROW_HEIGHT)
+  const visibleCount = Math.max(1, Math.ceil(clientHeight / ROW_HEIGHT))
   const endIndex = Math.min(startIndex + visibleCount, childrenCachedTotalRows.value)
 
   rowSlice.start = Math.max(0, startIndex - ROW_VIRTUAL_MARGIN)
   rowSlice.end = Math.min(childrenCachedTotalRows.value, endIndex + ROW_VIRTUAL_MARGIN)
 }
 
-// Recalculate slices when totalRows changes (e.g., after first chunk load)
+// Recalculate slices when totalRows changes (e.g., after first chunk load). Run again on the
+// next tick so the just-rendered scroll container gets measured (fixes empty persisted list
+// on first open when buffered pending links render the container before data arrives).
 watch(childrenCachedTotalRows, () => {
   calculateSlices()
+  nextTick(calculateSlices)
 })
 
 const updateVisibleChunks = () => {
