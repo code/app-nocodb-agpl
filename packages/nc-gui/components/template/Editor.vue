@@ -820,15 +820,6 @@ function getMappedColumns(tableName: string) {
   return (srcDestMapping.value[tableName] || []).filter((item) => item.destCn)
 }
 
-// Mapped destination titles that are has-many/one-to-many/one-to-one links —
-// linking these can reassign records away from other rows. Surfaced as a
-// full-width warning below the mapping table.
-function reassigningLinkFields(tableName: string): string[] {
-  return (srcDestMapping.value[tableName] || [])
-    .filter((item) => item.enabled && isReassigningLinkDest(item.destCn))
-    .map((item) => item.destCn as string)
-}
-
 function isAllMappedSelected(tableName: string) {
   const cols = getMappedColumns(tableName)
   return !!cols.length && getMappedColumns(tableName).every((item) => item.enabled)
@@ -1076,78 +1067,81 @@ function getErrorByTableName(tableName: string) {
                 </div>
 
                 <template v-else-if="column.key === 'destination_column'">
-                  <a-form-item class="!my-0 w-full">
-                    <NcSelect
-                      v-model:value="record.destCn"
-                      class="nc-field-select-input w-full nc-select-shadow !border-none"
-                      show-search
-                      allow-clear
-                      :placeholder="`-${$t('labels.multiField.selectField').toLowerCase()}-`"
-                      :filter-option="filterOption"
-                      dropdown-class-name="nc-dropdown-filter-field"
-                      @update:value="
-                        (value) => {
-                          record.enabled = !!value
-                        }
-                      "
-                    >
-                      <template #suffixIcon>
-                        <GeneralIcon icon="arrowDown" class="text-current" />
-                      </template>
-                      <a-select-option
-                        v-for="(col, i) of getUnselectedFields(record, table.table_name)"
-                        :key="i"
-                        :value="col.title"
-                        :disabled="col.readonly"
+                  <div class="w-full flex items-center gap-2">
+                    <a-form-item class="!my-0 flex-1 min-w-0">
+                      <NcSelect
+                        v-model:value="record.destCn"
+                        class="nc-field-select-input w-full nc-select-shadow !border-none"
+                        show-search
+                        allow-clear
+                        :placeholder="`-${$t('labels.multiField.selectField').toLowerCase()}-`"
+                        :filter-option="filterOption"
+                        dropdown-class-name="nc-dropdown-filter-field"
+                        @update:value="
+                          (value) => {
+                            record.enabled = !!value
+                          }
+                        "
                       >
-                        <div class="flex items-center gap-2 w-full">
-                          <SmartsheetHeaderIcon
-                            :column="col"
-                            class="flex-none w-3.5 h-3.5 !mx-0"
-                            color="text-nc-content-gray-muted"
-                          />
-                          <NcTooltip class="truncate flex-1" :show-on-truncate-only="!col.readonly">
-                            <template #title>
-                              {{ col.readonly ? col.permissions?.tooltip || t('msg.info.fieldReadonly') : col.title }}
-                            </template>
-                            {{ col.title }}
-                          </NcTooltip>
-                          <component
-                            :is="iconMap.check"
-                            v-if="record.destCn === col.title"
-                            id="nc-selected-item-icon"
-                            class="flex-none text-primary w-4 h-4"
-                          />
-                        </div>
-                      </a-select-option>
-                    </NcSelect>
-                  </a-form-item>
-                  <div v-if="isLinkDest(record.destCn)" class="flex items-center gap-2 mt-1.5 pl-1">
-                    <NcTooltip class="text-tiny text-nc-content-gray-muted whitespace-nowrap">
-                      <template #title>{{ $t('tooltip.linkValueDelimiter') }}</template>
-                      {{ $t('labels.linkValueDelimiter') }}
+                        <template #suffixIcon>
+                          <GeneralIcon icon="arrowDown" class="text-current" />
+                        </template>
+                        <a-select-option
+                          v-for="(col, i) of getUnselectedFields(record, table.table_name)"
+                          :key="i"
+                          :value="col.title"
+                          :disabled="col.readonly"
+                        >
+                          <div class="flex items-center gap-2 w-full">
+                            <SmartsheetHeaderIcon
+                              :column="col"
+                              class="flex-none w-3.5 h-3.5 !mx-0"
+                              color="text-nc-content-gray-muted"
+                            />
+                            <NcTooltip class="truncate flex-1" :show-on-truncate-only="!col.readonly">
+                              <template #title>
+                                {{ col.readonly ? col.permissions?.tooltip || t('msg.info.fieldReadonly') : col.title }}
+                              </template>
+                              {{ col.title }}
+                            </NcTooltip>
+                            <component
+                              :is="iconMap.check"
+                              v-if="record.destCn === col.title"
+                              id="nc-selected-item-icon"
+                              class="flex-none text-primary w-4 h-4"
+                            />
+                          </div>
+                        </a-select-option>
+                      </NcSelect>
+                    </a-form-item>
+                    <NcTooltip v-if="isReassigningLinkDest(record.destCn)" class="flex-none flex">
+                      <template #title>
+                        {{ $t('msg.warning.importLinkReassignField', { field: record.destCn }) }}
+                      </template>
+                      <GeneralIcon
+                        icon="ncAlertTriangle"
+                        class="w-4 h-4 text-nc-content-orange-medium"
+                        data-testid="nc-import-link-reassign-warning"
+                      />
                     </NcTooltip>
-                    <a-input
-                      v-model:value="record.delimiter"
-                      class="!w-14 !rounded-md nc-link-delimiter-input"
-                      size="small"
-                      :maxlength="3"
-                      :placeholder="DEFAULT_LINK_DELIMITER"
-                      data-testid="nc-import-link-delimiter"
-                    />
+                    <div v-if="isLinkDest(record.destCn)" class="flex items-center gap-1.5 flex-none">
+                      <NcTooltip class="text-tiny text-nc-content-gray-muted whitespace-nowrap">
+                        <template #title>{{ $t('tooltip.linkValueDelimiter') }}</template>
+                        {{ $t('labels.linkValueDelimiter') }}
+                      </NcTooltip>
+                      <a-input
+                        v-model:value="record.delimiter"
+                        class="!w-14 !rounded-md nc-link-delimiter-input"
+                        size="small"
+                        :maxlength="3"
+                        :placeholder="DEFAULT_LINK_DELIMITER"
+                        data-testid="nc-import-link-delimiter"
+                      />
+                    </div>
                   </div>
                 </template>
               </template>
             </NcTable>
-          </div>
-          <div
-            v-for="fieldName in reassigningLinkFields(table.table_name)"
-            :key="`reassign-${fieldName}`"
-            class="w-full flex items-start gap-2 px-4 py-2 bg-nc-bg-gray-extralight border-t border-nc-border-gray-light text-tiny text-nc-content-orange-medium"
-            data-testid="nc-import-link-reassign-warning"
-          >
-            <GeneralIcon icon="ncAlertTriangle" class="w-4 h-4 flex-none mt-0.5" />
-            <span class="flex-1">{{ $t('msg.warning.importLinkReassignField', { field: fieldName }) }}</span>
           </div>
         </a-collapse-panel>
       </a-collapse>
