@@ -85,6 +85,10 @@ export const presetErrorCodexMap: Partial<
     message: (id: string) => `Field ${id} not found`,
     code: 404,
   },
+  [NcErrorType.ERR_FILTER_NOT_FOUND]: {
+    message: (id: string) => `Filter '${id}' not found`,
+    code: 404,
+  },
   [NcErrorType.ERR_HOOK_NOT_FOUND]: {
     message: (id: string) => `Hook '${id}' not found`,
     code: 404,
