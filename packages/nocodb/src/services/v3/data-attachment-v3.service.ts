@@ -217,6 +217,16 @@ export class DataAttachmentV3Service {
     const { context, modelId, columnId, recordId, scope, attachment, req } =
       param;
 
+    if (
+      !attachment?.contentType ||
+      !attachment?.file ||
+      !attachment?.filename
+    ) {
+      NcError.get(context).invalidRequestBody(
+        `Field contentType, file and filename is required`,
+      );
+    }
+
     // Calculate file size from base64 value
     const fileSize = getBase64FileSize(attachment.file);
 

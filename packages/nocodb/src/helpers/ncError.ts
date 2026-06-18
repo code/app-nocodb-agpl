@@ -97,6 +97,10 @@ export class NcError {
     return NcError._.viewNotFound(id, args);
   }
 
+  static filterNotFound(id: string, args?: NcErrorArgs): never {
+    return NcError._.filterNotFound(id, args);
+  }
+
   static hookNotFound(id: string, args?: NcErrorArgs): never {
     return NcError._.hookNotFound(id, args);
   }
