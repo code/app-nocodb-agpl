@@ -168,6 +168,43 @@ export const serializeCheckboxValue = (
   return null;
 };
 
+/**
+ * Coerce a raw imported cell value (a CSV string or pasted text) into the value
+ * the destination column expects before it is written to the DB.
+ *
+ * Single source of truth shared by the server-side file-import job
+ * (`DataImportProcessor`) and the client-side CSV-upload extension, so both
+ * import paths produce identical rows. Previously these were two hand-synced
+ * `switch` statements that drifted (the client copy was missing `Duration` and
+ * used a different checkbox parser) — change coercion behaviour here only.
+ *
+ * Link/LTAR columns are intentionally NOT handled here: importers resolve those
+ * by display value in a separate link phase.
+ */
+export const serializeImportValue = (raw: any, col: ColumnType) => {
+  const value = raw === '' || raw === undefined || raw === null ? null : raw;
+
+  switch (col?.uidt as UITypes) {
+    case UITypes.Checkbox:
+      return serializeCheckboxValue(value);
+    case UITypes.SingleSelect:
+    case UITypes.MultiSelect:
+      return (value ?? '').toString().trim() || null;
+    case UITypes.Decimal:
+    case UITypes.Percent:
+      return serializeDecimalValue(value, undefined, { col });
+    case UITypes.Number:
+    case UITypes.Rating:
+      return serializeIntValue(value, { col });
+    case UITypes.Duration:
+      return value === null
+        ? null
+        : serializeDurationValue(value as string, col);
+    default:
+      return value;
+  }
+};
+
 export const serializeJsonValue = (value: any) => {
   try {
     return ncIsString(value)
