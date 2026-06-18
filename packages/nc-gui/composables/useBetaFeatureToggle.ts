@@ -99,6 +99,9 @@ const FEATURES = [
     enabled: false,
     version: 1,
     isEE: true,
+    // Licensed-only: hidden on self-hosted free (CE / unlicensed on-prem),
+    // available on licensed on-prem and cloud.
+    isLicensed: true,
   },
   {
     id: 'custom_link',
@@ -107,6 +110,9 @@ const FEATURES = [
     enabled: false,
     version: 1,
     isEE: true,
+    // Licensed-only: hidden on self-hosted free (CE / unlicensed on-prem),
+    // available on licensed on-prem and cloud.
+    isLicensed: true,
   },
   {
     id: 'view_actions',
@@ -275,11 +281,18 @@ export const useBetaFeatureToggle = createSharedComposable(() => {
 
   const isFeatureEnabled = (id: BetaFeatureId) => {
     // useEeConfig is called inside this function (not at the top level of the composable), to avoid a recursive call
-    const { showEEFeatures } = useEeConfig()
+    const { showEEFeatures, isEEFeatureBlocked } = useEeConfig()
 
     const feature = featureMap.value[id]
 
     if (feature && 'isEE' in feature && feature.isEE && !(isEeUI && showEEFeatures.value)) {
+      return false
+    }
+
+    // Licensed-only features are unavailable on self-hosted free (CE / unlicensed
+    // on-prem). `isEEFeatureBlocked` is true exactly there; false on licensed
+    // on-prem and cloud.
+    if (feature && 'isLicensed' in feature && feature.isLicensed && isEEFeatureBlocked.value) {
       return false
     }
 
