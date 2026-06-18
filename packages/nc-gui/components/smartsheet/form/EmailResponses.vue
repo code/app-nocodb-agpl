@@ -1,10 +1,5 @@
 <script setup lang="ts">
-interface BaseCollaborator {
-  id?: string
-  email: string
-  display_name?: string | null
-  meta?: any
-}
+import type { UserType } from 'nocodb-sdk'
 
 const props = withDefaults(
   defineProps<{
@@ -33,11 +28,12 @@ const { getBaseUsers } = useBases()
 
 const isOpen = ref(false)
 
-const searchText = ref('')
-
 const isLoading = ref(false)
 
-const collaborators = ref<BaseCollaborator[]>([])
+const collaborators = ref<UserType[]>([])
+
+// Template ref to NcList — exposes its search-filtered `list` so Select all can honor the active search
+const ncListRef = ref<{ list?: UserType[] } | null>(null)
 
 const emailMap = computed<Record<string, boolean>>(() => {
   try {
@@ -55,10 +51,6 @@ const selectedEmails = computed(() =>
 
 const selectedCount = computed(() => selectedEmails.value.length)
 
-const filteredCollaborators = computed(() =>
-  collaborators.value.filter((collab) => searchCompare([collab.display_name ?? '', collab.email], searchText.value)),
-)
-
 const triggerLabel = computed(() => {
   if (!selectedCount.value) return t('general.none')
 
@@ -73,6 +65,10 @@ const triggerLabel = computed(() => {
 
 function isSelected(email: string) {
   return !!emailMap.value[email]
+}
+
+function filterOption(query: string, option: NcListItemType) {
+  return antSelectFilterOption(query, option, ['email', 'display_name'])
 }
 
 function persist(map: Record<string, boolean>) {
@@ -109,13 +105,17 @@ async function toggle(email: string, value: boolean) {
 }
 
 async function selectAll() {
-  if (props.disabled || !collaborators.value.length) return
+  if (props.disabled) return
+
+  // Honor the active search: only select what is currently visible in the list
+  const visible = ncListRef.value?.list ?? collaborators.value
+  if (!visible.length) return
 
   if (!(await checkSmtp())) return
 
   const map = { ...emailMap.value }
-  for (const collab of collaborators.value) {
-    map[collab.email] = true
+  for (const collab of visible) {
+    if (collab.email) map[collab.email] = true
   }
 
   persist(map)
@@ -133,14 +133,7 @@ async function loadCollaborators() {
   isLoading.value = true
   try {
     const { users } = await getBaseUsers({ baseId: props.baseId })
-    collaborators.value = (users || [])
-      .filter((user: any) => user.email && !user.deleted)
-      .map((user: any) => ({
-        id: user.id,
-        email: user.email,
-        display_name: user.display_name,
-        meta: user.meta,
-      }))
+    collaborators.value = ((users ?? []) as Array<UserType & { deleted?: boolean }>).filter((user) => user.email && !user.deleted)
   } catch {
     collaborators.value = []
   } finally {
@@ -148,15 +141,18 @@ async function loadCollaborators() {
   }
 }
 
-watch(isOpen, (open) => {
-  if (open) {
-    searchText.value = ''
+watch(
+  () => props.baseId,
+  () => {
+    collaborators.value = []
     loadCollaborators()
-  }
-})
+  },
+  { immediate: true },
+)
 
-onMounted(() => {
-  loadCollaborators()
+// Refresh the list when the dropdown opens if it could not be loaded earlier (e.g. baseId arrived late)
+watch(isOpen, (open) => {
+  if (open && !collaborators.value.length) loadCollaborators()
 })
 </script>
 
@@ -168,7 +164,7 @@ onMounted(() => {
     overlay-class-name="nc-form-email-responses-overlay"
   >
     <div
-      v-e="[`a:form-view:email-responses`]"
+      v-e="['a:form-view:email-responses']"
       class="nc-form-email-responses-trigger flex items-center justify-between gap-2 min-w-[180px] h-8 px-3 rounded-lg border-1 border-nc-border-gray-medium transition-colors"
       :class="disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:border-nc-border-gray-dark'"
       data-testid="nc-form-email-responses-trigger"
@@ -180,72 +176,65 @@ onMounted(() => {
     </div>
 
     <template #overlay>
-      <div class="nc-form-email-responses-list flex flex-col py-2 w-[280px]" @click.stop>
-        <div class="px-2 pb-2">
-          <a-input
-            v-model:value="searchText"
-            :placeholder="$t('placeholder.findBaseCollaborator')"
-            class="!rounded-lg nc-form-email-responses-search"
-            allow-clear
-            data-testid="nc-form-email-responses-search"
-          >
-            <template #prefix>
-              <GeneralIcon icon="search" class="text-nc-content-gray-muted mr-1" />
-            </template>
-          </a-input>
-        </div>
-
-        <div class="flex flex-col max-h-[240px] overflow-y-auto nc-scrollbar-thin px-1">
-          <div v-if="isLoading" class="px-3 py-2 text-nc-content-gray-muted">{{ $t('general.loading') }}</div>
-          <div v-else-if="!filteredCollaborators.length" class="px-3 py-2 text-nc-content-gray-muted">
-            {{ $t('labels.noResults') }}
-          </div>
-          <div
-            v-for="collab in filteredCollaborators"
-            :key="collab.email"
-            class="flex items-center px-2 py-1 rounded-lg hover:bg-nc-bg-gray-light"
-            :data-testid="`nc-form-email-responses-item-${collab.email}`"
-          >
+      <NcList
+        ref="ncListRef"
+        :open="isOpen"
+        :value="selectedEmails"
+        :list="collaborators"
+        :is-loading="isLoading"
+        is-multi-select
+        option-value-key="email"
+        option-label-key="email"
+        :item-height="48"
+        :close-on-select="false"
+        show-search-always
+        :search-input-placeholder="$t('placeholder.findBaseCollaborator')"
+        :filter-option="filterOption"
+        :empty-description="$t('labels.noResults')"
+        class="nc-form-email-responses-list !w-[300px]"
+        item-class-name="!py-1"
+      >
+        <template #listItem="{ option }">
+          <div class="flex items-center w-full min-w-0" :data-testid="`nc-form-email-responses-item-${option.email}`">
             <NcSwitch
-              :checked="isSelected(collab.email)"
+              :checked="isSelected(option.email)"
               :disabled="disabled"
               placement="right"
               size="xsmall"
               content-wrapper-class="flex-1 min-w-0 !pl-0"
-              @change="(val: boolean) => toggle(collab.email, val)"
+              @change="(val: boolean) => toggle(option.email, val)"
             >
-              <div class="flex items-center gap-2 min-w-0 pl-2">
-                <GeneralUserIcon size="small" :initials-length="1" :user="collab" class="flex-none" />
-                <NcTooltip class="truncate" show-on-truncate-only>
-                  <template #title>{{ collab.display_name || collab.email }}</template>
-                  {{ collab.display_name || collab.email.slice(0, collab.email.indexOf('@')) }}
-                </NcTooltip>
-              </div>
+              <NcUserInfo :user="(option as UserType)" :disabled="disabled" />
             </NcSwitch>
           </div>
-        </div>
+        </template>
 
-        <div class="flex items-center gap-4 px-3 pt-2 mt-1 border-t-1 border-nc-border-gray-light">
-          <NcButton
-            type="text"
-            size="small"
-            :disabled="disabled || !collaborators.length"
-            data-testid="nc-form-email-responses-select-all"
-            @click="selectAll"
-          >
-            {{ $t('general.selectAll') }}
-          </NcButton>
-          <NcButton
-            type="text"
-            size="small"
-            :disabled="disabled || !selectedCount"
-            data-testid="nc-form-email-responses-clear-all"
-            @click="clearAll"
-          >
-            {{ $t('labels.clearAll') }}
-          </NcButton>
-        </div>
-      </div>
+        <template #listFooter>
+          <NcDivider class="!my-1" />
+          <div class="flex items-center gap-4 px-3 py-1">
+            <NcButton
+              v-e="['a:form-view:email-responses:select-all']"
+              type="text"
+              size="small"
+              :disabled="disabled || !collaborators.length"
+              data-testid="nc-form-email-responses-select-all"
+              @click="selectAll"
+            >
+              {{ $t('general.selectAll') }}
+            </NcButton>
+            <NcButton
+              v-e="['a:form-view:email-responses:clear-all']"
+              type="text"
+              size="small"
+              :disabled="disabled || !selectedCount"
+              data-testid="nc-form-email-responses-clear-all"
+              @click="clearAll"
+            >
+              {{ $t('labels.clearAll') }}
+            </NcButton>
+          </div>
+        </template>
+      </NcList>
     </template>
   </NcDropdown>
 </template>

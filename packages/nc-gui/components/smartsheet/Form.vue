@@ -49,6 +49,8 @@ const enum NcForm {
 
 const { isMobileMode, user, appInfo } = useGlobal()
 
+const { $api, $e } = useNuxtApp()
+
 const { isUIAllowed } = useRoles()
 
 const { getMeta, getMetaByKey } = useMetas()
