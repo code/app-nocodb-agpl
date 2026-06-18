@@ -5004,10 +5004,12 @@ export class ColumnsService implements IColumnsService {
             : null;
 
           // If child/parent columns or tables are missing (orphaned link),
-          // skip relation cleanup and just delete the column metadata
+          // we can't run the normal relation cleanup. Delete this column's
+          // metadata, and — for an MM link — complete the teardown of the
+          // junction-side residue that outlives the deleted related table.
           if (!childColumn || !childTable || !parentColumn || !parentTable) {
             this.logger.warn(
-              `Orphaned LTAR column ${param.columnId} — related column or table missing, deleting column metadata only`,
+              `Orphaned LTAR column ${param.columnId} — related column or table missing, completing orphaned-relation teardown`,
             );
             await Column.delete2(
               context,
@@ -5017,6 +5019,115 @@ export class ColumnsService implements IColumnsService {
               },
               ncMeta,
             );
+
+            // MM: the junction model is a SEPARATE entity that survives the
+            // related table's deletion — along with the reverse user link and
+            // the system hm links pointing at the junction. Deleting only this
+            // column would leave that residue (a live junction model + links
+            // dangling at a dropped junction table), which later resurfaces as
+            // orphaned-link crashes. Tear the whole junction down so nothing
+            // dangles. (Guard only fires for genuinely orphaned relations, so
+            // this never runs for a normal delete.)
+            if (relationColOpt.fk_mm_model_id) {
+              const junctionId = relationColOpt.fk_mm_model_id;
+
+              // Columns referencing the junction: user links (fk_mm_model_id)
+              // and system hm links (fk_related_model_id). Their owning columns
+              // must be removed explicitly — Model.delete only sweeps the
+              // col_relation rows, not the columns on the other tables.
+              const refRelations = [
+                ...(await ncMeta.metaList2(
+                  context.workspace_id,
+                  context.base_id,
+                  MetaTable.COL_RELATIONS,
+                  { condition: { fk_mm_model_id: junctionId } },
+                )),
+                ...(await ncMeta.metaList2(
+                  context.workspace_id,
+                  context.base_id,
+                  MetaTable.COL_RELATIONS,
+                  { condition: { fk_related_model_id: junctionId } },
+                )),
+              ];
+              for (const rel of refRelations) {
+                if (!rel.fk_column_id || rel.fk_column_id === param.columnId) {
+                  continue;
+                }
+                await Column.delete2(
+                  context,
+                  {
+                    id: rel.fk_column_id,
+                    // may be soft-deleted (cascaded reverse/system link)
+                    includeDeleted: true,
+                    ...generateColumnDeleteHandler(columnWebhookManager),
+                  },
+                  ncMeta,
+                );
+              }
+
+              // Drop the junction model. Its physical table drop is idempotent
+              // (DROP TABLE IF EXISTS) and best-effort — it is usually already
+              // gone by the time we get here.
+              const junction = await Model.get(
+                context,
+                junctionId,
+                true,
+                ncMeta,
+              );
+              if (junction) {
+                try {
+                  // getColumns must run first — tableDelete builds a rollback
+                  // (down) query from junction.columns; without it that builder
+                  // dereferences undefined. Matches the normal mm teardown.
+                  await junction.getColumns(context, ncMeta);
+                  (junction as any).tn = junction.table_name;
+                  junction.columns.forEach((c) => {
+                    (c as any).cn = c.column_name;
+                  });
+                  await sqlMgr.sqlOpPlus(source, 'tableDelete', junction);
+                } catch (e) {
+                  this.logger.warn(
+                    `Orphaned junction ${junctionId}: physical drop skipped (${e?.message})`,
+                  );
+                }
+                await junction.delete(context, ncMeta, true);
+              }
+            } else if (
+              relationColOpt.fk_child_column_id &&
+              relationColOpt.fk_parent_column_id
+            ) {
+              // Non-junction links (hm/bt/oo): the reverse link on the related
+              // table shares this relation's child + parent FK columns. Remove
+              // it so it isn't left dangling at the now-deleted related table.
+              // (The FK column is unique per relationship, so this matches only
+              // the paired reverse link.)
+              const reverseRels = await ncMeta.metaList2(
+                context.workspace_id,
+                context.base_id,
+                MetaTable.COL_RELATIONS,
+                {
+                  condition: {
+                    fk_child_column_id: relationColOpt.fk_child_column_id,
+                    fk_parent_column_id: relationColOpt.fk_parent_column_id,
+                  },
+                },
+              );
+              for (const rel of reverseRels) {
+                if (!rel.fk_column_id || rel.fk_column_id === param.columnId) {
+                  continue;
+                }
+                await Column.delete2(
+                  context,
+                  {
+                    id: rel.fk_column_id,
+                    // may be soft-deleted (cascaded reverse/system link)
+                    includeDeleted: true,
+                    ...generateColumnDeleteHandler(columnWebhookManager),
+                  },
+                  ncMeta,
+                );
+              }
+            }
             break;
           }
 

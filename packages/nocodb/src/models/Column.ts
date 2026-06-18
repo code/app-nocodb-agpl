@@ -871,12 +871,14 @@ export default class Column<T = any> implements ColumnType {
     context: NcContext,
     {
       id,
+      includeDeleted,
       beforeRelatedColumnDelete,
       afterRelatedColumnDelete,
       beforeRelatedColumnUpdate,
       afterRelatedColumnUpdate,
     }: {
       id: string;
+      includeDeleted?: boolean;
       beforeRelatedColumnDelete?: (
         context: { base_id: string; workspace_id: string },
         columnId: string,
@@ -896,7 +898,7 @@ export default class Column<T = any> implements ColumnType {
     },
     ncMeta = Noco.ncMeta,
   ) {
-    const col = await this.get(context, { colId: id }, ncMeta);
+    const col = await this.get(context, { colId: id, includeDeleted }, ncMeta);
 
     // if column is not found, return
     if (!col) {
