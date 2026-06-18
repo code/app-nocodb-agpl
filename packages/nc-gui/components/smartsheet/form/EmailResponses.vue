@@ -210,12 +210,12 @@ onMounted(() => {
               :checked="isSelected(collab.email)"
               :disabled="disabled"
               placement="right"
-              size="small"
+              size="xsmall"
               content-wrapper-class="flex-1 min-w-0 !pl-0"
               @change="(val: boolean) => toggle(collab.email, val)"
             >
               <div class="flex items-center gap-2 min-w-0 pl-2">
-                <GeneralUserIcon size="small" :user="collab" class="flex-none" />
+                <GeneralUserIcon size="small" :initials-length="1" :user="collab" class="flex-none" />
                 <NcTooltip class="truncate" show-on-truncate-only>
                   <template #title>{{ collab.display_name || collab.email }}</template>
                   {{ collab.display_name || collab.email.slice(0, collab.email.indexOf('@')) }}
