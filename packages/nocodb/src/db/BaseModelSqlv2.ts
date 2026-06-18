@@ -9226,22 +9226,14 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
       args: ast.dependencyFields,
     });
 
-    for (const item of list) {
-      const extractedId = this.extractPksValues(item);
-      // Route through broadcastDataEvent so this matches the regular update
-      // path: RLS-aware fan-out to access groups, plus emit to the standard
-      // room. broadcastEvent() only hits the standard room — RLS-subscribed
-      // sockets wouldn't see link updates and would render stale link cells
-      // until refresh.
-      NocoSocket.broadcastDataEvent(this.context, {
-        payload: {
-          action: 'update',
-          payload: item,
-          id: extractedId,
-        },
-        tableId: this.model.id,
-      });
-    }
+    NocoSocket.broadcastBulkDataEvent(this.context, {
+      tableId: this.model.id,
+      rows: list.map((item) => ({
+        id: this.extractPksValues(item),
+        action: 'update' as const,
+        payload: item,
+      })),
+    });
   }
 
   public async broadcastLinkUpdates(ids: Array<string>) {
