@@ -2128,15 +2128,6 @@ export function useInfiniteData(args: {
         const found = findCachedRowByPk(dataCaches, id)
 
         if (!found) {
-          if (!isGroupBy.value) {
-            // Row not cached — optimistically treat as an add so it shows up.
-            // In group-by mode we'd need the group-column value to pick the right
-            // group cache; skip that case rather than mis-inserting into root.
-            handleDataEvent({
-              ...data,
-              action: 'add',
-            })
-          }
           return
         }
 
