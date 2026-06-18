@@ -451,13 +451,19 @@ const handleUpdateRefTable = () => {
   })
 }
 
+// referenceTableChildId's setter ignores falsy values, so clear the underlying model fields directly
+const clearSelectedTable = () => {
+  vModel.value.childId = null
+  vModel.value.childTableTitle = undefined
+}
+
 const onBaseChange = async (baseId: string) => {
   // load tables for the selected base
   await tablesStore.loadProjectTables(baseId)
 
-  // reset current model id value
-  if (referenceTableChildId.value) {
-    referenceTableChildId.value = null
+  // keep the selected table only when linking within the current base, otherwise clear it
+  if (baseId !== meta.value?.base_id) {
+    clearSelectedTable()
   }
 }
 
@@ -510,12 +516,18 @@ const onFilterLabelClick = () => {
 }
 
 const onCrossBaseToggle = () => {
-  // reset current model id value if cross base disabled and selected table is not in current base
+  const currentBaseId = meta.value?.base_id
+
+  // base the selected table currently belongs to — capture before resetting referenceBaseId
+  const selectedBaseId = referenceBaseId.value ?? currentBaseId
+
   if (!crossBase.value) {
     referenceBaseId.value = null
-    if (refTables.value.every((t) => t.id !== referenceTableChildId)) {
-      referenceTableChildId.value = null
-    }
+  }
+
+  // keep the selected table only if it belongs to the current base, otherwise clear it
+  if (selectedBaseId !== currentBaseId) {
+    clearSelectedTable()
   }
 }
 
