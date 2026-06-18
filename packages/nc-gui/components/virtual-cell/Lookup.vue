@@ -133,6 +133,20 @@ const isAttachmentLeafLookup = computed(
     isAttachment(lookupLeafColumn.value),
 )
 
+// A "multi-value" leaf packs several values into a single related record, so one
+// arrValue element maps to many rendered chips: User / CreatedBy / LastModifiedBy
+// (comma-joined user ids or an array of users) and MultiSelect (comma-joined option
+// titles). Used to count actual values for the dropdown gate. Splitting on ',' is
+// safe here — user ids are comma-free nanoids and MultiSelect option titles are
+// validated to reject commas (columns.service.ts / SelectOptions.vue).
+const isMultiValueLeafLookup = computed(
+  () =>
+    !!lookupLeafColumn.value &&
+    [UITypes.User, UITypes.CreatedBy, UITypes.LastModifiedBy, UITypes.MultiSelect].includes(
+      lookupLeafColumn.value.uidt as UITypes,
+    ),
+)
+
 // Ensure every table meta in the lookup chain is loaded so lookupLeafColumn can
 // resolve; re-runs as metas arrive (getMetaByKey is reactive).
 watch(
@@ -288,10 +302,24 @@ const isSearchable = computed(() => {
   return searchableUITypes.includes(lookupColumn.value.uidt! as UITypes)
 })
 
+// Number of values the dropdown would show. arrValue counts related records, but a
+// multi-value leaf (User family / MultiSelect) packs several comma-joined values into
+// one element — so a single linked record with multiple values must still open the
+// dropdown.
+const dropdownValueCount = computed(() => {
+  if (!isMultiValueLeafLookup.value) return arrValue.value.length
+
+  return arrValue.value.reduce((count, v) => {
+    if (v === null || v === undefined) return count
+    if (ncIsArray(v)) return count + v.length
+    if (ncIsString(v)) return count + v.split(',').filter((val) => val.trim()).length
+    return count + 1
+  }, 0)
+})
+
 const disableDropdown = computed(() => {
   if (!lookupColumn.value) return true
-  if (arrValue.value.length < 2) return true
-  return false
+  return dropdownValueCount.value < 2
 })
 
 const filteredArrValues = computed(() => {
