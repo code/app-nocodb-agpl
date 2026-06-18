@@ -133,6 +133,15 @@ const isAttachmentLeafLookup = computed(
     isAttachment(lookupLeafColumn.value),
 )
 
+// A User-type leaf (User / CreatedBy / LastModifiedBy) can hold multiple users
+// in a single related record (comma-joined ids), so one arrValue element maps
+// to many rendered chips. Used to count actual values for the dropdown gate.
+const isUserLeafLookup = computed(
+  () =>
+    !!lookupLeafColumn.value &&
+    [UITypes.User, UITypes.CreatedBy, UITypes.LastModifiedBy].includes(lookupLeafColumn.value.uidt as UITypes),
+)
+
 // Ensure every table meta in the lookup chain is loaded so lookupLeafColumn can
 // resolve; re-runs as metas arrive (getMetaByKey is reactive).
 watch(
@@ -288,10 +297,23 @@ const isSearchable = computed(() => {
   return searchableUITypes.includes(lookupColumn.value.uidt! as UITypes)
 })
 
+// Number of values the dropdown would show. arrValue counts related records,
+// but a User leaf packs multiple comma-joined users into one element — so a
+// single linked record with several users must still open the dropdown.
+const dropdownValueCount = computed(() => {
+  if (!isUserLeafLookup.value) return arrValue.value.length
+
+  return arrValue.value.reduce((count, v) => {
+    if (v === null || v === undefined) return count
+    if (ncIsArray(v)) return count + v.length
+    if (ncIsString(v)) return count + v.split(',').filter((id) => id.trim()).length
+    return count + 1
+  }, 0)
+})
+
 const disableDropdown = computed(() => {
   if (!lookupColumn.value) return true
-  if (arrValue.value.length < 2) return true
-  return false
+  return dropdownValueCount.value < 2
 })
 
 const filteredArrValues = computed(() => {
