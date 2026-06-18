@@ -2168,6 +2168,8 @@
     "searchDisplayValue": "Select display value field",
     "changeTitleField": "Change title field",
     "clearAll": "Clear all",
+    "emailResponses": "Email responses",
+    "peopleSelected": "{count} person | {count} people",
     "addNewLookupHelperText1": "Lookup fields show data from linked records. Select specific fields from ",
     "addNewLookupHelperText2": " table to add them as Lookup fields in this table.",
     "addNewRollupHelperText1": "Rollup fields are used to aggregate data from fields in the related table. Select specific fields from ",
@@ -3456,6 +3458,7 @@
     "groupingNotSupportedForFieldsWithErrors": "Grouping is not supported for fields with errors"
   },
   "placeholder": {
+    "findBaseCollaborator": "Find a base collaborator",
     "enterVerificationCode": "Enter 6-digit code",
     "enterBackupCode": "Enter backup code (e.g., xxxx-xxxx)",
     "variableKey": "e.g. WEBHOOK_URL",
