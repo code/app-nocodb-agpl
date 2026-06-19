@@ -76,9 +76,7 @@ const syncedGroupByEntries = computed<Group[]>(() => {
 // Views that persist the per-group enable/disable toggle (`group_by_enabled`).
 // Grid and Gantt accept the field on their *ColumnUpdate ops + view-column
 // schema; Timeline/List don't yet, so their toggle stays hidden.
-const supportsGroupByEnabledToggle = computed(() =>
-  [ViewTypes.GRID, ViewTypes.GANTT].includes(view.value?.type as ViewTypes),
-)
+const supportsGroupByEnabledToggle = computed(() => [ViewTypes.GRID, ViewTypes.GANTT].includes(view.value?.type as ViewTypes))
 
 // All group-by column IDs for badge count and column filtering
 const groupedByColumnIds = computed(() => {
