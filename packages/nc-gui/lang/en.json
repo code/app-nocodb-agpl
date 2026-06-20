@@ -412,6 +412,7 @@
     "creatingEntity": "Creating {entity}",
     "details": "Details",
     "skip": "Skip",
+    "other": "Other",
     "code": "Code",
     "codeBlock": "Code Block",
     "duplicate": "Duplicate",
