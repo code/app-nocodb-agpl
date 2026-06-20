@@ -130,10 +130,14 @@ export class SortsV3Service {
       context,
     );
 
-    // check for existing filter with same field
+    // check for existing sort with same field. For list views the same table
+    // can appear at multiple levels, so scope the check to the level when
+    // `fkLevelId` is set — a column may be sorted once per level.
     const sorts = await Sort.list(context, { viewId: param.viewId }, ncMeta);
     const existingSort = sorts.find(
-      (s) => s.fk_column_id === param.sort.field_id,
+      (s) =>
+        s.fk_column_id === param.sort.field_id &&
+        (param.fkLevelId ? s.fk_level_id === param.fkLevelId : true),
     );
     if (existingSort) {
       NcError.get(context).invalidRequestBody(
