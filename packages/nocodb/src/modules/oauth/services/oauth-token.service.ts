@@ -10,6 +10,7 @@ import {
   User,
 } from '~/models';
 import { NcError } from '~/helpers/ncError';
+import { buildOAuthAccessTokenClaims } from '~/modules/oauth/services/oauth-token.claims';
 import Noco from '~/Noco';
 
 export interface TokenResponse {
@@ -68,17 +69,14 @@ export class OauthTokenService {
     const now = Math.floor(Date.now() / 1000);
 
     return jwt.sign(
-      {
-        sub: payload.userId,
-        email: user.email,
-        client_id: payload.clientId,
+      buildOAuthAccessTokenClaims({
+        userId: payload.userId,
+        clientId: payload.clientId,
         scope: payload.scope,
-        iat: now,
-        exp: now + this.ACCESS_TOKEN_EXPIRES_IN,
-        id: user.id,
-        roles: user.roles,
-        token_version: user.token_version,
-      },
+        user,
+        nowSeconds: now,
+        expiresInSeconds: this.ACCESS_TOKEN_EXPIRES_IN,
+      }),
       Noco.config.auth.jwt.secret,
       {
         algorithm: 'HS256',
