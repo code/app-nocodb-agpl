@@ -1,4 +1,5 @@
 import { FormulaDataTypes } from 'nocodb-sdk';
+import { NC_MAX_TEXT_LENGTH } from '~/constants';
 import type CustomKnex from '~/db/CustomKnex';
 
 export interface IGetAggregateFn {
@@ -61,14 +62,17 @@ export const formulaOutputsRawJson = (node: any): boolean => {
 // (via SUBSTR) guarantees the driver never streams back more than this many
 // characters per cell, regardless of the database platform.
 //
-// Overridable via the NC_FORMULA_MAX_OUTPUT_LENGTH env var.
-const DEFAULT_FORMULA_OUTPUT_MAX_LENGTH = 1_000_000;
-
+// Defaults to NC_MAX_TEXT_LENGTH (100k) — the same limit LongText columns are
+// truncated to on read (see select-object.ts) — so a formula's string value
+// stays consistent with other text values and can be pasted into a text field.
+// A dedicated NC_FORMULA_MAX_OUTPUT_LENGTH env var can override this when a
+// different formula-specific cap is needed.
 export const getFormulaOutputMaxLength = (): number => {
-  const parsed = Number(process.env.NC_FORMULA_MAX_OUTPUT_LENGTH);
-  return Number.isFinite(parsed) && parsed > 0
-    ? Math.floor(parsed)
-    : DEFAULT_FORMULA_OUTPUT_MAX_LENGTH;
+  const override = Number(process.env.NC_FORMULA_MAX_OUTPUT_LENGTH);
+  if (Number.isFinite(override) && override > 0) {
+    return Math.floor(override);
+  }
+  return NC_MAX_TEXT_LENGTH;
 };
 
 // Wrap a formula's final string expression so the database truncates the value
