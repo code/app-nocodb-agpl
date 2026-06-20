@@ -14,8 +14,12 @@ const SAFE_DEFAULTS: Record<string, string> = {
 // representable across PG/MySQL/SQLite/MSSQL. Map them to their underlying date
 // format so server-side SQL formatting stays correct. See issue #9154.
 const WEEKDAY_FORMAT_BASE: Record<string, string> = {
+  'dddd YYYY-MM-DD': 'YYYY-MM-DD',
+  'ddd YYYY-MM-DD': 'YYYY-MM-DD',
   'dddd DD/MM/YYYY': 'DD/MM/YYYY',
   'ddd DD/MM/YYYY': 'DD/MM/YYYY',
+  'dddd MM/DD/YYYY': 'MM/DD/YYYY',
+  'ddd MM/DD/YYYY': 'MM/DD/YYYY',
 };
 
 export function convertDateFormat(date_format: string, type: string) {
