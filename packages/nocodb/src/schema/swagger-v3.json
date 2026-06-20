@@ -11691,7 +11691,7 @@
         "properties": {
           "date_format": {
             "type": "string",
-            "description": "Date format. Supported options are listed below\n- `YYYY/MM/DD`\n- `YYYY-MM-DD`\n- `YYYY MM DD`\n- `DD/MM/YYYY`\n- `DD-MM-YYYY`\n- `DD MM YYYY`\n- `MM/DD/YYYY`\n- `MM-DD-YYYY`\n- `MM DD YYYY`\n- `YYYY-MM`\n- `YYYY MM`"
+            "description": "Date format. Supported options are listed below\n- `YYYY/MM/DD`\n- `YYYY-MM-DD`\n- `YYYY MM DD`\n- `DD/MM/YYYY`\n- `DD-MM-YYYY`\n- `DD MM YYYY`\n- `MM/DD/YYYY`\n- `MM-DD-YYYY`\n- `MM DD YYYY`\n- `YYYY-MM`\n- `YYYY MM`\n- `dddd DD/MM/YYYY`\n- `ddd DD/MM/YYYY`"
           },
           "time_format": {
             "type": "string",
@@ -11722,7 +11722,7 @@
         "properties": {
           "date_format": {
             "type": "string",
-            "description": "Date format. Supported options are listed below\n- `YYYY/MM/DD`\n- `YYYY-MM-DD`\n- `YYYY MM DD`\n- `DD/MM/YYYY`\n- `DD-MM-YYYY`\n- `DD MM YYYY`\n- `MM/DD/YYYY`\n- `MM-DD-YYYY`\n- `MM DD YYYY`\n- `YYYY-MM`\n- `YYYY MM`"
+            "description": "Date format. Supported options are listed below\n- `YYYY/MM/DD`\n- `YYYY-MM-DD`\n- `YYYY MM DD`\n- `DD/MM/YYYY`\n- `DD-MM-YYYY`\n- `DD MM YYYY`\n- `MM/DD/YYYY`\n- `MM-DD-YYYY`\n- `MM DD YYYY`\n- `YYYY-MM`\n- `YYYY MM`\n- `dddd DD/MM/YYYY`\n- `ddd DD/MM/YYYY`"
           }
         },
         "additionalProperties": false

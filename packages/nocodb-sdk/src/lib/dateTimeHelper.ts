@@ -26,6 +26,11 @@ export const dateFormats = [
   'DD-MM-YYYY',
   'MM-DD-YYYY',
   'DD/MM/YYYY',
+  // Weekday-prefixed variants of DD/MM/YYYY (display-only; weekday rendered by
+  // dayjs on the frontend). Lets grid group-by headers show e.g.
+  // "Wednesday 10/06/2026" while groups keep chronological order. See issue #9154.
+  'dddd DD/MM/YYYY',
+  'ddd DD/MM/YYYY',
   'MM/DD/YYYY',
   'DD MM YYYY',
   'MM DD YYYY',
