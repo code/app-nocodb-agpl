@@ -23,3 +23,10 @@ export async function clearSandboxCreatingState(
   _context: NcContext,
   _baseId: string,
 ): Promise<void> {}
+
+export async function isSandboxTeardownInProgress(
+  _context: NcContext,
+  _baseId: string,
+): Promise<boolean> {
+  return false;
+}
