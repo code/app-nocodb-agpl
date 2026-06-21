@@ -2136,6 +2136,7 @@
     "createNewSandbox": "Create new sandbox",
     "sandboxPublishing": "Publishing…",
     "sandboxDeleting": "Deleting…",
+    "sandboxDeleteRetryHint": "Taking too long? Click to retry.",
     "mergeFailed": "Merge failed",
     "master": "Master",
     "schemaLocked": "Schema Locked",
