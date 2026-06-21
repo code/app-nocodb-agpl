@@ -1,4 +1,4 @@
-// src/meta/migrations/v0/nc_202606181200_sandbox_production_readiness.ts
+// src/meta/migrations/v0/nc_202606191200_sandbox_production_readiness.ts
 import type { Knex } from 'knex';
 import { MetaTable } from '~/utils/globals';
 
