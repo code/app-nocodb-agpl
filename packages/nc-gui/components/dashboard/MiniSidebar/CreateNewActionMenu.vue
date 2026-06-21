@@ -143,6 +143,10 @@ const tableCreateReason = computed(() => {
   return sandboxRestrictionReason('tableCreate', {
     roles: base.value?.project_role || base.value.workspace_role,
     source: base.value?.sources?.[0],
+    // ProjectInj is not provided in the MiniSidebar tree, so the useRoles
+    // wrapper's injected-base fallback is empty here — pass base explicitly or
+    // the reason is always null (the gate would be inert on a sandbox-master).
+    base: base.value,
   })
 })
 
@@ -173,19 +177,31 @@ const hasDashboardCreateAccess = computed(() => {
 const dashboardCreateReason = computed(() => {
   if (!base.value || !isBaseHomePage.value) return null
 
-  return sandboxRestrictionReason('dashboardCreate')
+  return sandboxRestrictionReason('dashboardCreate', {
+    roles: base.value?.project_role || base.value.workspace_role,
+    source: base.value?.sources?.[0],
+    base: base.value,
+  })
 })
 
 const workflowCreateReason = computed(() => {
   if (!base.value || !isBaseHomePage.value) return null
 
-  return sandboxRestrictionReason('workflowCreateOrEdit')
+  return sandboxRestrictionReason('workflowCreateOrEdit', {
+    roles: base.value?.project_role || base.value.workspace_role,
+    source: base.value?.sources?.[0],
+    base: base.value,
+  })
 })
 
 const scriptCreateReason = computed(() => {
   if (!base.value || !isBaseHomePage.value) return null
 
-  return sandboxRestrictionReason('scriptCreateOrEdit')
+  return sandboxRestrictionReason('scriptCreateOrEdit', {
+    roles: base.value?.project_role || base.value.workspace_role,
+    source: base.value?.sources?.[0],
+    base: base.value,
+  })
 })
 
 const hasDocumentCreateAccess = computed(() => {
