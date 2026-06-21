@@ -99,7 +99,7 @@ const isOptionVisible = computed(() => {
       </NcMenuItem>
     </NcTooltip>
 
-    <NcDivider v-if="['baseDuplicate', 'baseRename'].some((permission) => isUIAllowed(permission))" />
+    <NcDivider v-if="['baseDuplicate', 'baseRename'].some((permission) => isUIAllowed(permission)) || !!baseDuplicateReason" />
 
     <!-- Copy Project Info -->
     <NcMenuItem v-if="!isEeUI" key="copy" data-testid="nc-sidebar-base-copy-base-info" @click.stop="emits('copyProjectInfo')">

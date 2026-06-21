@@ -113,7 +113,7 @@ watch(isWebhookModal, (newVal) => {
               <a-divider style="margin: 4px 0" />
               <NcTooltip :title="hookCreateReason ? $t(hookCreateReason) : ''" :disabled="!hookCreateReason">
                 <div
-                  class="flex items-center text-sm cursor-pointer"
+                  class="flex items-center text-sm"
                   :class="
                     hookCreateReason ? 'text-nc-content-gray-muted cursor-not-allowed' : 'text-nc-content-brand cursor-pointer'
                   "
