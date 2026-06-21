@@ -170,6 +170,24 @@ const hasDashboardCreateAccess = computed(() => {
   return isUIAllowed('dashboardCreate')
 })
 
+const dashboardCreateReason = computed(() => {
+  if (!base.value || !isBaseHomePage.value) return null
+
+  return sandboxRestrictionReason('dashboardCreate')
+})
+
+const workflowCreateReason = computed(() => {
+  if (!base.value || !isBaseHomePage.value) return null
+
+  return sandboxRestrictionReason('workflowCreateOrEdit')
+})
+
+const scriptCreateReason = computed(() => {
+  if (!base.value || !isBaseHomePage.value) return null
+
+  return sandboxRestrictionReason('scriptCreateOrEdit')
+})
+
 const hasDocumentCreateAccess = computed(() => {
   if (!base.value || !isBaseHomePage.value) return true
 
@@ -211,6 +229,8 @@ const hasDocumentCreateAccess = computed(() => {
                   ? $t('tooltip.switchToWorkflowsTab', { type: $t('general.workflow').toLowerCase() })
                   : !isBaseHomePage
                   ? $t('tooltip.navigateToBaseToCreateWorkflow')
+                  : workflowCreateReason
+                  ? $t(workflowCreateReason)
                   : !hasWorkflowCreateAccess
                   ? $t('tooltip.youDontHaveAccessToCreateNewWorkflow')
                   : ''
@@ -237,6 +257,8 @@ const hasDocumentCreateAccess = computed(() => {
                   ? $t('tooltip.switchToWorkflowsTab', { type: $t('general.script').toLowerCase() })
                   : !isBaseHomePage
                   ? $t('tooltip.navigateToBaseToCreateScript')
+                  : scriptCreateReason
+                  ? $t(scriptCreateReason)
                   : !hasScriptCreateAccess
                   ? $t('tooltip.youDontHaveAccessToCreateNewScript')
                   : ''
@@ -407,6 +429,8 @@ const hasDocumentCreateAccess = computed(() => {
                   ? $t('tooltip.switchToDataTab', { type: $t('general.dashboard').toLowerCase() })
                   : !isBaseHomePage
                   ? $t('tooltip.navigateToBaseToCreateDashboard')
+                  : dashboardCreateReason
+                  ? $t(dashboardCreateReason)
                   : !hasDashboardCreateAccess
                   ? $t('tooltip.youDontHaveAccessToCreateNewDashboard')
                   : ''
