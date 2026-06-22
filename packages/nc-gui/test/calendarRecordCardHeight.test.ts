@@ -1,7 +1,6 @@
 import {
-  CALENDAR_CARD_BASE_HEIGHT,
   cardHeightForFieldCount,
-  computeRowLayout,
+  computeColumnPackedLayout,
 } from '~/components/smartsheet/calendar/calendarRecordCardHeight'
 
 describe('cardHeightForFieldCount', () => {
@@ -22,48 +21,51 @@ describe('cardHeightForFieldCount', () => {
   })
 })
 
-describe('computeRowLayout', () => {
-  it('reproduces the legacy uniform 28px layout', () => {
-    // legacy: top = row*28 + (row+1)*8  →  8, 44, 80
-    const { tops } = computeRowLayout([
-      { rowIndex: 0, height: CALENDAR_CARD_BASE_HEIGHT },
-      { rowIndex: 1, height: CALENDAR_CARD_BASE_HEIGHT },
-      { rowIndex: 2, height: CALENDAR_CARD_BASE_HEIGHT },
+describe('computeColumnPackedLayout', () => {
+  it('packs a single column tightly using each card natural height', () => {
+    // one column, three cards of differing heights, stacked in order
+    const tops = computeColumnPackedLayout([
+      { startCol: 0, spanCols: 1, rowIndex: 0, height: 68 },
+      { startCol: 0, spanCols: 1, rowIndex: 1, height: 28 },
+      { startCol: 0, spanCols: 1, rowIndex: 2, height: 48 },
+    ])
+    // gap=8: 8, then 8+68+8=84, then 84+28+8=120
+    expect(tops).toEqual([8, 84, 120])
+  })
+
+  it('keeps columns independent so heights in one do not inflate another', () => {
+    // col 0 has a tall card; col 1 a short one — col 1 stays compact
+    const tops = computeColumnPackedLayout([
+      { startCol: 0, spanCols: 1, rowIndex: 0, height: 68 }, // col 0
+      { startCol: 1, spanCols: 1, rowIndex: 0, height: 28 }, // col 1
+      { startCol: 1, spanCols: 1, rowIndex: 1, height: 28 }, // col 1 second card
+    ])
+    expect(tops[0]).toBe(8) // col 0 first
+    expect(tops[1]).toBe(8) // col 1 first — NOT pushed down by col 0
+    expect(tops[2]).toBe(44) // col 1 second: 8+28+8
+  })
+
+  it('places a multi-day bar below everything in every column it spans, aligned', () => {
+    // col 0 has a tall row-0 card (68), col 1 a short one (28);
+    // a span across col 0+1 at row 1 must clear the taller column.
+    const tops = computeColumnPackedLayout([
+      { startCol: 0, spanCols: 1, rowIndex: 0, height: 68 }, // col 0 row 0
+      { startCol: 1, spanCols: 1, rowIndex: 0, height: 28 }, // col 1 row 0
+      { startCol: 0, spanCols: 2, rowIndex: 1, height: 28 }, // span col 0-1 row 1
     ])
     expect(tops[0]).toBe(8)
-    expect(tops[1]).toBe(44)
-    expect(tops[2]).toBe(80)
+    expect(tops[1]).toBe(8)
+    // span clears max(col0Bottom=8+68+8=84, col1Bottom=8+28+8=44) = 84
+    expect(tops[2]).toBe(84)
   })
 
-  it('uses the tallest card in a row as that row height', () => {
-    // two cards share row 0 (e.g. different columns); the taller one wins
-    const { heights } = computeRowLayout([
-      { rowIndex: 0, height: 28 },
-      { rowIndex: 0, height: 68 },
-      { rowIndex: 1, height: 48 },
+  it('pushes later cards in a spanned column below the bar (no overlap)', () => {
+    const tops = computeColumnPackedLayout([
+      { startCol: 0, spanCols: 2, rowIndex: 0, height: 48 }, // span col 0-1 row 0
+      { startCol: 1, spanCols: 1, rowIndex: 1, height: 28 }, // col 1 below the span
     ])
-    expect(heights[0]).toBe(68)
-    expect(heights[1]).toBe(48)
-  })
-
-  it('keeps multi-day bars aligned: row tops are cumulative of per-row max heights', () => {
-    // row 0 max = 68 (a tall single-day card sets the row height),
-    // a multi-day bar sits in row 1 and must start below the full 68 + gaps.
-    const { tops, heights } = computeRowLayout([
-      { rowIndex: 0, height: 28 }, // column A, row 0
-      { rowIndex: 0, height: 68 }, // column B, row 0 (taller → sets row height)
-      { rowIndex: 1, height: 48 }, // multi-day bar spanning columns, row 1
-    ])
-    expect(heights[0]).toBe(68)
-    expect(tops[0]).toBe(8) // gap before first row
-    // row 1 top = gap + row0Height + gap = 8 + 68 + 8 = 84
-    expect(tops[1]).toBe(84)
-  })
-
-  it('handles gaps in row indices (defaults missing rows to base height)', () => {
-    const { tops } = computeRowLayout([{ rowIndex: 2, height: 48 }])
-    // rows 0 and 1 absent → default 28 each
-    // top0 = 8; top1 = 8+28+8 = 44; top2 = 44+28+8 = 80
-    expect(tops[2]).toBe(80)
+    expect(tops[0]).toBe(8)
+    // col1 next card starts after span bottom: 8+48+8 = 64
+    expect(tops[1]).toBe(64)
   })
 })

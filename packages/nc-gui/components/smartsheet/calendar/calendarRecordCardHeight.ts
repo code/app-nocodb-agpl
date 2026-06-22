@@ -1,10 +1,11 @@
-// Height math for calendar week-view record cards.
+// Height + layout math for calendar week-view record cards.
 //
-// Week-view cards can show multiple fields stacked over several lines instead of
-// a single truncated line. These pure helpers compute a card's natural height
-// from its visible field count and lay out the all-day stacking grid so that
-// multi-day bars (which share a row index across the days they span) stay
-// aligned across columns even when row heights vary.
+// Week-view cards show multiple fields stacked over several lines instead of a
+// single truncated line. Each card is its OWN natural height (no stretching),
+// and cards pack tightly down each day column. Multi-day bars (which occupy
+// several columns at one logical row) sit below whatever is already placed in
+// every column they span, so they never overlap and stay aligned across the
+// columns they cover.
 
 /** Height of a single-field card — matches the legacy `h-7` (28px) card. */
 export const CALENDAR_CARD_BASE_HEIGHT = 28
@@ -15,7 +16,7 @@ export const CALENDAR_CARD_FIELD_HEIGHT = 20
 /** Max fields a card grows to show before clipping (+ click-to-expand). */
 export const CALENDAR_CARD_MAX_FIELDS = 3
 
-/** Vertical gap between stacked rows in the all-day week view. */
+/** Vertical gap between stacked cards in the all-day week view. */
 export const CALENDAR_CARD_ROW_GAP = 8
 
 /**
@@ -29,35 +30,45 @@ export function cardHeightForFieldCount(count: number): number {
   return CALENDAR_CARD_BASE_HEIGHT + (fields - 1) * CALENDAR_CARD_FIELD_HEIGHT
 }
 
+export interface CalendarLayoutItem {
+  /** Index of the first day column the record occupies. */
+  startCol: number
+  /** Number of day columns the record spans (1 for single-day records). */
+  spanCols: number
+  /** Stacking order within a column (from findFirstSuitableRow). */
+  rowIndex: number
+  /** The record's natural card height. */
+  height: number
+}
+
 /**
- * Lay out the all-day stacking grid.
+ * Pack cards down each day column using their natural heights.
  *
- * Each item carries the shared row index it was assigned (`findFirstSuitableRow`)
- * and its natural height. A row's height is the tallest card in that row across
- * all columns, so a multi-day bar occupying row `r` lines up with every other
- * card in row `r`. Tops are the cumulative sum of the rows above, plus a gap
- * before each row — which reproduces the legacy `row*28 + (row+1)*8` layout
- * exactly when every card is the base height.
+ * Processes records in stacking order (rowIndex ascending) and greedily places
+ * each one just below the lowest occupied point across all the columns it spans.
+ * Returns a `tops` array parallel to `items` (px from the top of the grid).
+ *
+ * - Single-day records → each column packs tightly with no wasted space.
+ * - Multi-day bars → placed below everything already in their spanned columns,
+ *   so they never overlap and share one consistent top across those columns.
  */
-export function computeRowLayout(
-  items: { rowIndex: number; height: number }[],
-  gap: number = CALENDAR_CARD_ROW_GAP,
-): { heights: Record<number, number>; tops: Record<number, number> } {
-  const heights: Record<number, number> = {}
-  let maxRow = -1
+export function computeColumnPackedLayout(items: CalendarLayoutItem[], gap: number = CALENDAR_CARD_ROW_GAP): number[] {
+  const order = items.map((item, index) => ({ ...item, index })).sort((a, b) => a.rowIndex - b.rowIndex)
 
-  for (const { rowIndex, height } of items) {
-    heights[rowIndex] = Math.max(heights[rowIndex] ?? 0, height)
-    if (rowIndex > maxRow) maxRow = rowIndex
+  const columnBottom: Record<number, number> = {}
+  const tops: number[] = new Array(items.length)
+
+  for (const item of order) {
+    let top = gap
+    for (let c = item.startCol; c < item.startCol + item.spanCols; c++) {
+      top = Math.max(top, columnBottom[c] ?? gap)
+    }
+    tops[item.index] = top
+    const bottom = top + item.height + gap
+    for (let c = item.startCol; c < item.startCol + item.spanCols; c++) {
+      columnBottom[c] = bottom
+    }
   }
 
-  const tops: Record<number, number> = {}
-  let acc = 0
-  for (let r = 0; r <= maxRow; r++) {
-    const h = heights[r] ?? CALENDAR_CARD_BASE_HEIGHT
-    tops[r] = acc + gap
-    acc += h + gap
-  }
-
-  return { heights, tops }
+  return tops
 }

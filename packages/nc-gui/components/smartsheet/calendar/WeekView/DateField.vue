@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import dayjs from 'dayjs'
 import type { ColumnType } from 'nocodb-sdk'
-import { cardHeightForFieldCount, computeRowLayout } from '../calendarRecordCardHeight'
+import { cardHeightForFieldCount, computeColumnPackedLayout } from '../calendarRecordCardHeight'
 import type { Row } from '~/lib/types'
 
 const emits = defineEmits(['expandRecord', 'newRecord'])
@@ -218,9 +218,11 @@ const calendarData = computed(() => {
           position,
           id,
           spanningDays: Math.abs(ogStartDate.diff(endDate, 'day')) - Math.abs(startDate.diff(endDate, 'day')),
-          // Stashed for the post-pass that computes per-row height + top offsets.
+          // Stashed for the post-pass that packs cards down each column.
           suitableRow,
           cardHeight,
+          startCol: startDaysDiff,
+          spanCols: spanDays,
           style: {
             width: `calc(max(${
               columnOffsetPx(startDaysDiff + spanDays - 1) +
@@ -256,16 +258,20 @@ const calendarData = computed(() => {
     }
   })
 
-  // Variable per-row heights: each shared row index takes the height of its
-  // tallest card across all columns, and tops are cumulative — so multi-day bars
-  // (which share a row index across spanned days) stay aligned across columns.
-  const { heights, tops } = computeRowLayout(
-    recordsInRange.map((r) => ({ rowIndex: r.rowMeta.suitableRow, height: r.rowMeta.cardHeight })),
+  // Each card keeps its own natural height and packs tightly down its column;
+  // multi-day bars sit below whatever is already in the columns they span.
+  const tops = computeColumnPackedLayout(
+    recordsInRange.map((r) => ({
+      startCol: r.rowMeta.startCol!,
+      spanCols: r.rowMeta.spanCols!,
+      rowIndex: r.rowMeta.suitableRow!,
+      height: r.rowMeta.cardHeight!,
+    })),
   )
-  for (const r of recordsInRange) {
-    r.rowMeta.style.top = `${tops[r.rowMeta.suitableRow]}px`
-    r.rowMeta.style.height = `${heights[r.rowMeta.suitableRow]}px`
-  }
+  recordsInRange.forEach((r, i) => {
+    r.rowMeta.style.top = `${tops[i]}px`
+    r.rowMeta.style.height = `${r.rowMeta.cardHeight}px`
+  })
 
   return recordsInRange
 })

@@ -155,10 +155,12 @@ interface Row {
     minutes?: number
     recordIndex?: number // For week spanning records in month view
     maxSpanning?: number
-    // Calendar all-day week view: shared stacking row index + natural card height
-    // (px) used to lay out variable-height multi-field cards.
+    // Calendar all-day week view: stacking order + natural card height (px) +
+    // spanned column range, used to pack variable-height multi-field cards.
     suitableRow?: number
     cardHeight?: number
+    startCol?: number
+    spanCols?: number
     /** Per-button-column visibility: true = button disabled for this row */
     buttonDisabled?: Record<string, boolean>
     /**
