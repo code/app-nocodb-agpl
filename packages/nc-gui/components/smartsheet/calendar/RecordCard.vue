@@ -75,8 +75,12 @@ const rowColorInfo = computed(() => {
         'bg-nc-pink-500': props.color === 'pink',
         'bg-nc-purple-500': props.color === 'purple',
         'bg-nc-gray-900': color === 'gray',
+        // Multiline: inset rounded accent that clears the card's rounded corners.
+        'self-stretch my-1.5 rounded-full': multiline,
+        // Single-line: original short centered bar.
+        'min-h-6.5': !multiline,
       }"
-      class="w-1 min-h-6.5 self-stretch"
+      class="w-1"
       :style="rowColorInfo.rowLeftBorderColor"
     ></div>
 
