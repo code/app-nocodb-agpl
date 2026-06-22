@@ -4778,15 +4778,19 @@ export class ColumnsService implements IColumnsService {
           // source table.
           if (refTable && refTable.id !== table.id) {
             await refTable.getColumns(refContext, ncMeta);
-            NocoSocket.broadcastEvent(refContext, {
-              event: EventType.META_EVENT,
-              payload: {
-                action: 'column_add',
+            NocoSocket.broadcastEvent(
+              refContext,
+              {
+                event: EventType.META_EVENT,
                 payload: {
-                  table: refTable,
+                  action: 'column_add',
+                  payload: {
+                    table: refTable,
+                  },
                 },
               },
-            });
+              context.socket_id,
+            );
           }
         }
       } catch (e) {
