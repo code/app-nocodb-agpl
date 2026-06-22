@@ -132,8 +132,20 @@ const rowColorInfo = computed(() => {
   }
 }
 
-// In multiline mode each visible field is its own truncated line.
-.nc-calendar-card-fields > * {
-  @apply truncate w-full text-sm text-nc-content-gray leading-5;
+// In multiline mode each visible field is its own clean truncated line.
+// Drop the inline "•" separators (meant for the single-line layout), give the
+// lead field gentle emphasis and mute the rest — reads as a record card, not a
+// run-on of values.
+.nc-calendar-card-fields :deep(.plain-cell) {
+  @apply truncate w-full leading-5 text-bodySm text-nc-content-gray-subtle;
+
+  &::before {
+    content: '' !important;
+    padding: 0 !important;
+  }
+}
+
+.nc-calendar-card-fields :deep(.plain-cell:first-child) {
+  @apply text-nc-content-gray font-semibold;
 }
 </style>
