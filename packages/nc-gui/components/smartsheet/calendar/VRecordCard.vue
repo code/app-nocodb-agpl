@@ -77,6 +77,7 @@ const rowColorInfo = computed(() => {
         wrap-child="div"
         :disabled="selected || dragging"
         overlay-class-name="nc-record-fields-tooltip"
+        show-on-truncate-only
         :class="
           multiline
             ? 'nc-calendar-vcard-fields flex flex-col gap-0.5 w-full overflow-hidden flex-1 min-h-0'

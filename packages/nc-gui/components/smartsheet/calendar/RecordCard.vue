@@ -96,29 +96,44 @@ const rowColorInfo = computed(() => {
     <div class="overflow-hidden gap-2 flex w-full" :class="multiline ? 'items-start py-1' : 'items-center justify-center'">
       <span v-if="position === 'rightRounded' || position === 'none'" class="ml-2 mb-0.6"> .... </span>
       <slot name="time" />
-      <NcTooltip
-        wrap-child="div"
-        :disabled="selected || dragging"
-        overlay-class-name="nc-record-fields-tooltip"
+      <div
         :class="[{ 'pr-8.5': position === 'leftRounded' }, multiline ? 'overflow-hidden' : 'mb-0.5 overflow-x-hidden truncate']"
         class="flex w-full flex-col gap-1"
       >
-        <template #title>
-          <slot name="tooltip">
-            <slot />
-          </slot>
-        </template>
-        <div v-if="multiline" class="nc-calendar-card-fields flex flex-col gap-0.5 w-full overflow-hidden">
+        <!-- Multiline (all-day week): stacked fields; tooltip reveals the full
+             labeled record on hover (the body hides fields behind "+N more"). -->
+        <NcTooltip
+          v-if="multiline"
+          wrap-child="div"
+          :disabled="selected || dragging"
+          overlay-class-name="nc-record-fields-tooltip"
+          class="nc-calendar-card-fields flex flex-col gap-0.5 w-full overflow-hidden"
+        >
+          <template #title>
+            <slot name="tooltip">
+              <slot />
+            </slot>
+          </template>
           <slot />
-        </div>
-        <span
+        </NcTooltip>
+        <!-- Single-line: prod behaviour — tooltip only when the text is clipped. -->
+        <NcTooltip
           v-else
-          class="break-word whitespace-nowrap overflow-hidden pr-1 text-sm text-nowrap text-nc-content-gray leading-7"
+          :disabled="selected || dragging"
+          overlay-class-name="nc-record-fields-tooltip"
+          show-on-truncate-only
+          wrap-child="span"
+          class="break-word whitespace-nowrap overflow-hidden pr-1"
           :class="{ 'text-ellipsis': ['leftRounded', 'rightRounded', 'rounded'].includes(position) }"
         >
-          <slot />
-        </span>
-      </NcTooltip>
+          <slot class="text-sm text-nowrap text-nc-content-gray leading-7" />
+          <template #title>
+            <slot name="tooltip">
+              <slot />
+            </slot>
+          </template>
+        </NcTooltip>
+      </div>
       <span v-if="position === 'leftRounded' || position === 'none'" class="absolute mb-0.6 z-10 right-5"> ... </span>
     </div>
 
