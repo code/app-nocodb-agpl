@@ -5,11 +5,17 @@ const { activeCalendarView, recordHeightMode, viewMetaProperties } = useCalendar
 
 const { updateViewMeta } = useViewsStore()
 
+const { isSharedBase } = storeToRefs(useBase())
+
+const { canUpdateViewMeta } = useViewColumnsOrThrow()
+
 const { $e } = useNuxtApp()
 
 const activeView = inject(ActiveViewInj, ref())
 
 const isLocked = inject(IsLockedInj, ref(false))
+
+const isPublic = inject(IsPublicInj, ref(false))
 
 const { t } = useI18n()
 
@@ -29,16 +35,29 @@ const heightOptions = computed<{ value: RecordHeightMode; icon: keyof typeof ico
 ])
 
 const setRecordHeightMode = (value: RecordHeightMode) => {
-  if (isLocked.value) return
+  if (isLocked.value || value === recordHeightMode.value) {
+    open.value = false
+    return
+  }
 
   $e('c:calendar:record-height', { mode: value })
 
-  updateViewMeta(activeView.value?.id as string, ViewTypes.CALENDAR, {
-    meta: {
-      ...(viewMetaProperties.value || {}),
-      record_height_mode: value,
+  // Persisting to the view meta needs editor+ (ACL: calendarViewUpdate). For
+  // viewers / public / shared-base, skip the network call so the toggle still
+  // applies locally without a 403 — mirrors the grid Record Height control.
+  updateViewMeta(
+    activeView.value?.id as string,
+    ViewTypes.CALENDAR,
+    {
+      meta: {
+        ...(viewMetaProperties.value || {}),
+        record_height_mode: value,
+      },
     },
-  })
+    {
+      skipNetworkCall: isPublic.value || isSharedBase.value || !canUpdateViewMeta.value,
+    },
+  )
 
   open.value = false
 }
@@ -56,7 +75,6 @@ useMenuCloseOnEsc(open)
   >
     <div>
       <NcButton
-        v-e="['c:calendar:record-height:open']"
         class="nc-calendar-record-height-btn nc-toolbar-btn !border-0 !h-7 !px-1.5 !min-w-7"
         size="small"
         type="secondary"
