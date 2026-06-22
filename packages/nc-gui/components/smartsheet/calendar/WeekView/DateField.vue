@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import dayjs from 'dayjs'
 import type { ColumnType } from 'nocodb-sdk'
+import { cardHeightForFieldCount, computeRowLayout } from '../calendarRecordCardHeight'
 import type { Row } from '~/lib/types'
 
 const emits = defineEmits(['expandRecord', 'newRecord'])
@@ -204,6 +205,11 @@ const calendarData = computed(() => {
       else if (isStartInRange) position = 'leftRounded'
       else if (isEndInRange) position = 'rightRounded'
 
+      // Card height grows with the number of non-empty visible fields (capped),
+      // so week-view cards can show several fields over multiple lines.
+      const visibleFieldCount = (fields.value ?? []).filter(Boolean).filter((f) => !isRowEmpty(record, f!)).length
+      const cardHeight = cardHeightForFieldCount(visibleFieldCount)
+
       recordsInRange.push({
         ...record,
         rowMeta: {
@@ -212,6 +218,9 @@ const calendarData = computed(() => {
           position,
           id,
           spanningDays: Math.abs(ogStartDate.diff(endDate, 'day')) - Math.abs(startDate.diff(endDate, 'day')),
+          // Stashed for the post-pass that computes per-row height + top offsets.
+          suitableRow,
+          cardHeight,
           style: {
             width: `calc(max(${
               columnOffsetPx(startDaysDiff + spanDays - 1) +
@@ -220,7 +229,6 @@ const calendarData = computed(() => {
               0.5
             }px, ${columnWidthPx(startDaysDiff) + 0.5}px))`,
             left: `${columnOffsetPx(startDaysDiff) - 1}px`,
-            top: `${suitableRow * 28 + Math.max(suitableRow + 1, 1) * 8}px`,
           },
         },
       })
@@ -247,6 +255,17 @@ const calendarData = computed(() => {
       formattedData.value.forEach(processRecord)
     }
   })
+
+  // Variable per-row heights: each shared row index takes the height of its
+  // tallest card across all columns, and tops are cumulative — so multi-day bars
+  // (which share a row index across spanned days) stay aligned across columns.
+  const { heights, tops } = computeRowLayout(
+    recordsInRange.map((r) => ({ rowIndex: r.rowMeta.suitableRow, height: r.rowMeta.cardHeight })),
+  )
+  for (const r of recordsInRange) {
+    r.rowMeta.style.top = `${tops[r.rowMeta.suitableRow]}px`
+    r.rowMeta.style.height = `${heights[r.rowMeta.suitableRow]}px`
+  }
 
   return recordsInRange
 })
@@ -646,6 +665,8 @@ const addRecord = (date: dayjs.Dayjs) => {
               :position="record.rowMeta.position"
               :record="record"
               :resize="!!record.rowMeta.range?.fk_to_col && isUIAllowed('dataEdit')"
+              size="auto"
+              multiline
               @dblclick.stop="emits('expandRecord', record)"
               @resize-start="onResizeStart"
             >

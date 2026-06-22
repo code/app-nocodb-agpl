@@ -1260,6 +1260,7 @@ watch(
                 :resize="!!record.rowMeta.range?.fk_to_col && isUIAllowed('dataEdit')"
                 :record="record"
                 :selected="record.rowMeta!.id === dragRecord?.rowMeta?.id"
+                multiline
                 @resize-start="onResizeStart"
               >
                 <template v-for="(field, id) in fields" :key="id">

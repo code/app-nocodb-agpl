@@ -10,6 +10,9 @@ interface Props {
   size?: 'small' | 'medium' | 'large' | 'auto'
   position?: 'leftRounded' | 'rightRounded' | 'rounded' | 'none'
   dragging?: boolean
+  // When true the card fills its container height and stacks visible fields over
+  // multiple lines (week view) instead of clamping to a single truncated line.
+  multiline?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -19,6 +22,7 @@ const props = withDefaults(defineProps<Props>(), {
   size: 'small',
   position: 'rounded',
   dragging: false,
+  multiline: false,
 })
 
 const emit = defineEmits(['resizeStart'])
@@ -45,6 +49,8 @@ const rowColorInfo = computed(() => {
       'bg-nc-purple-50': props.color === 'purple',
       'bg-nc-bg-default border-nc-border-gray-dark': color === 'gray',
       '!bg-nc-bg-gray-light': hover || dragging,
+      'items-start py-1': multiline,
+      'items-center': !multiline,
     }"
     :style="{
       boxShadow:
@@ -54,7 +60,7 @@ const rowColorInfo = computed(() => {
 
       ...rowColorInfo.rowBgColor,
     }"
-    class="relative transition-all border-1 flex-none flex items-center gap-2 group overflow-hidden"
+    class="relative transition-all border-1 flex-none flex gap-2 group overflow-hidden"
   >
     <div
       v-if="position === 'leftRounded' || position === 'rounded'"
@@ -77,16 +83,18 @@ const rowColorInfo = computed(() => {
       @mousedown.stop="emit('resizeStart', 'left', $event, record)"
     ></div>
 
-    <div class="overflow-hidden items-center justify-center gap-2 flex w-full">
+    <div class="overflow-hidden gap-2 flex w-full" :class="multiline ? 'items-start' : 'items-center justify-center'">
       <span v-if="position === 'rightRounded' || position === 'none'" class="ml-2 mb-0.6"> .... </span>
       <slot name="time" />
       <div
-        :class="{
-          'pr-8.5': position === 'leftRounded',
-        }"
-        class="flex mb-0.5 overflow-x-hidden w-full truncate flex-col gap-1"
+        :class="[{ 'pr-8.5': position === 'leftRounded' }, multiline ? 'overflow-hidden' : 'mb-0.5 overflow-x-hidden truncate']"
+        class="flex w-full flex-col gap-1"
       >
+        <div v-if="multiline" class="nc-calendar-card-fields flex flex-col gap-0.5 w-full overflow-hidden">
+          <slot />
+        </div>
         <NcTooltip
+          v-else
           :disabled="selected || dragging"
           :class="{
             ' text-ellipsis': ['leftRounded', 'rightRounded', 'rounded'].includes(position),
@@ -122,5 +130,10 @@ const rowColorInfo = computed(() => {
   .bold {
     @apply !text-nc-content-gray font-bold;
   }
+}
+
+// In multiline mode each visible field is its own truncated line.
+.nc-calendar-card-fields > * {
+  @apply truncate w-full text-sm text-nc-content-gray leading-5;
 }
 </style>
