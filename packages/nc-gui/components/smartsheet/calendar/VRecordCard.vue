@@ -70,12 +70,23 @@ const rowColorInfo = computed(() => {
     ></div>
 
     <div
-      class="flex pt-1 w-full flex-col gap-1 overflow-hidden"
+      class="flex pt-1 w-full flex-col gap-1 overflow-hidden h-full"
       :class="{ 'overflow-x-hidden whitespace-nowrap text-ellipsis truncate': !multiline }"
     >
-      <div v-if="multiline" class="nc-calendar-vcard-fields flex flex-col gap-0.5 w-full overflow-hidden">
+      <NcTooltip
+        v-if="multiline"
+        wrap-child="div"
+        :disabled="selected || dragging"
+        overlay-class-name="nc-calendar-card-tooltip"
+        class="nc-calendar-vcard-fields flex flex-col gap-0.5 w-full overflow-hidden flex-1 min-h-0"
+      >
+        <template #title>
+          <div class="nc-calendar-card-tooltip-fields flex flex-col gap-1 text-left">
+            <slot />
+          </div>
+        </template>
         <slot />
-      </div>
+      </NcTooltip>
       <div v-else class="truncate">
         <NcTooltip
           class="break-word whitespace-nowrap overflow-hidden text-ellipsis pr-1"
@@ -89,7 +100,9 @@ const rowColorInfo = computed(() => {
         </NcTooltip>
       </div>
 
-      <slot name="time" />
+      <div class="flex-shrink-0">
+        <slot name="time" />
+      </div>
     </div>
     <div
       v-if="resize"
@@ -114,7 +127,10 @@ const rowColorInfo = computed(() => {
 // In multiline mode each visible field is its own clean truncated line:
 // drop the inline "•" separators, emphasise the lead field, mute the rest.
 .nc-calendar-vcard-fields :deep(.plain-cell) {
-  @apply truncate w-full leading-5 text-bodySm text-nc-content-gray-subtle;
+  // shrink-0: keep each field at its natural line height so a short (duration-
+  // sized) card clips cleanly to the first field(s) instead of squashing every
+  // field to an invisible sliver.
+  @apply truncate w-full leading-5 text-bodySm text-nc-content-gray-subtle flex-shrink-0;
 
   &::before {
     content: '' !important;
@@ -124,5 +140,32 @@ const rowColorInfo = computed(() => {
 
 .nc-calendar-vcard-fields :deep(.plain-cell:first-child) {
   @apply text-nc-content-gray font-semibold;
+}
+</style>
+
+<!-- Global (non-scoped): the tooltip overlay is teleported to <body>, so scoped
+     styles can't reach it. Render all fields as clean multiline rows. -->
+<style lang="scss">
+// Cap the tooltip height and scroll when a record has many fields.
+.nc-calendar-card-tooltip .ant-tooltip-inner {
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.nc-calendar-card-tooltip .nc-calendar-card-tooltip-fields {
+  .plain-cell {
+    display: block;
+    width: 100%;
+    line-height: 18px;
+
+    &::before {
+      content: '' !important;
+      padding: 0 !important;
+    }
+  }
+
+  .plain-cell:first-child {
+    font-weight: 600;
+  }
 }
 </style>
