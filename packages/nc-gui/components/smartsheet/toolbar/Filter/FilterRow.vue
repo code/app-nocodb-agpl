@@ -532,7 +532,7 @@ const onChangeToDynamic = async () => {
         <template v-for="compOp of comparisonOps" :key="compOp.value">
           <a-select-option :value="compOp.value">
             <div class="flex items-center w-full justify-between w-full gap-2">
-              <div class="truncate flex-1">{{ getFilterOpLabel(compOp.text) }}</div>
+              <div class="truncate flex-1">{{ getFilterOpLabel(compOp.i18nKey, compOp.text) }}</div>
               <component
                 :is="iconMap.check"
                 v-if="vModel.comparison_op === compOp.value"
@@ -571,8 +571,8 @@ const onChangeToDynamic = async () => {
               <a-select-option :value="compSubOp.value">
                 <div class="flex items-center w-full justify-between w-full gap-2 max-w-40">
                   <NcTooltip show-on-truncate-only class="truncate flex-1">
-                    <template #title>{{ getFilterOpLabel(compSubOp.text) }}</template>
-                    {{ getFilterOpLabel(compSubOp.text) }}
+                    <template #title>{{ getFilterOpLabel(compSubOp.i18nKey, compSubOp.text) }}</template>
+                    {{ getFilterOpLabel(compSubOp.i18nKey, compSubOp.text) }}
                   </NcTooltip>
                   <component
                     :is="iconMap.check"
