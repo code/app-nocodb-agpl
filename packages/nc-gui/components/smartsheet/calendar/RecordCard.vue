@@ -101,21 +101,25 @@ const rowColorInfo = computed(() => {
         class="flex w-full flex-col gap-1"
       >
         <!-- Multiline (all-day week): stacked fields; tooltip reveals the full
-             labeled record, only when a field line is actually clipped. -->
+             labeled record, only when a field line is actually clipped. The
+             inner .nc-calendar-card-fields div is kept so its scoped no-bullet
+             styling applies (the body must render exactly as before). -->
         <NcTooltip
           v-if="multiline"
           wrap-child="div"
           :disabled="selected || dragging"
           overlay-class-name="nc-record-fields-tooltip"
           show-on-truncate-only
-          class="nc-calendar-card-fields flex flex-col gap-0.5 w-full overflow-hidden"
+          class="w-full overflow-hidden"
         >
           <template #title>
             <slot name="tooltip">
               <slot />
             </slot>
           </template>
-          <slot />
+          <div class="nc-calendar-card-fields flex flex-col gap-0.5 w-full overflow-hidden">
+            <slot />
+          </div>
         </NcTooltip>
         <!-- Single-line: prod behaviour — tooltip only when the text is clipped. -->
         <NcTooltip
