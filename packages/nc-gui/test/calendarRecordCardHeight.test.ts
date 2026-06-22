@@ -1,7 +1,4 @@
-import {
-  cardHeightForFieldCount,
-  computeColumnPackedLayout,
-} from '~/components/smartsheet/calendar/calendarRecordCardHeight'
+import { cardHeightForFieldCount, computeColumnPackedLayout } from '~/components/smartsheet/calendar/calendarRecordCardHeight'
 
 describe('cardHeightForFieldCount', () => {
   it('shows at least one line', () => {
@@ -13,11 +10,12 @@ describe('cardHeightForFieldCount', () => {
   it('grows per field', () => {
     expect(cardHeightForFieldCount(2)).toBe(48)
     expect(cardHeightForFieldCount(3)).toBe(68)
+    expect(cardHeightForFieldCount(5)).toBe(108)
   })
 
-  it('caps at the max field count', () => {
-    expect(cardHeightForFieldCount(4)).toBe(68)
-    expect(cardHeightForFieldCount(20)).toBe(68)
+  it('caps at the max field count (5)', () => {
+    expect(cardHeightForFieldCount(6)).toBe(108)
+    expect(cardHeightForFieldCount(20)).toBe(108)
   })
 })
 

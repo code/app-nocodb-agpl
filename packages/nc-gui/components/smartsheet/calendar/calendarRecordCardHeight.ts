@@ -14,7 +14,7 @@ export const CALENDAR_CARD_BASE_HEIGHT = 28
 export const CALENDAR_CARD_FIELD_HEIGHT = 20
 
 /** Max fields a card grows to show before clipping (+ click-to-expand). */
-export const CALENDAR_CARD_MAX_FIELDS = 3
+export const CALENDAR_CARD_MAX_FIELDS = 5
 
 /** Vertical gap between stacked cards in the all-day week view. */
 export const CALENDAR_CARD_ROW_GAP = 8

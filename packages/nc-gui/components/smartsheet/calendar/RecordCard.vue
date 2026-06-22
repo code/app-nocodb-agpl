@@ -37,9 +37,12 @@ const rowColorInfo = computed(() => {
     :class="{
       'h-7': size === 'small',
       'h-full': size === 'auto',
-      'rounded-l-[4px] !border-r-0 ml-1': position === 'leftRounded',
-      'rounded-r-[4px] !border-l-0 mr-1': position === 'rightRounded',
-      'rounded-[4px] ml-0.8 mr-1': position === 'rounded',
+      'rounded-l-[4px] !border-r-0 ml-1': position === 'leftRounded' && !multiline,
+      'rounded-l-lg !border-r-0 ml-1': position === 'leftRounded' && multiline,
+      'rounded-r-[4px] !border-l-0 mr-1': position === 'rightRounded' && !multiline,
+      'rounded-r-lg !border-l-0 mr-1': position === 'rightRounded' && multiline,
+      'rounded-[4px] ml-0.8 mr-1': position === 'rounded' && !multiline,
+      'rounded-lg ml-0.8 mr-1': position === 'rounded' && multiline,
       'rounded-none !border-x-0': position === 'none',
       'bg-nc-maroon-50': props.color === 'maroon',
       'bg-nc-blue-50': props.color === 'blue',
@@ -73,7 +76,7 @@ const rowColorInfo = computed(() => {
         'bg-nc-purple-500': props.color === 'purple',
         'bg-nc-gray-900': color === 'gray',
       }"
-      class="w-1 min-h-6.5"
+      class="w-1 min-h-6.5 self-stretch"
       :style="rowColorInfo.rowLeftBorderColor"
     ></div>
 
