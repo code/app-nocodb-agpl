@@ -74,31 +74,22 @@ const rowColorInfo = computed(() => {
       :class="{ 'overflow-x-hidden whitespace-nowrap text-ellipsis truncate': !multiline }"
     >
       <NcTooltip
-        v-if="multiline"
         wrap-child="div"
         :disabled="selected || dragging"
         overlay-class-name="nc-calendar-card-tooltip"
-        class="nc-calendar-vcard-fields flex flex-col gap-0.5 w-full overflow-hidden flex-1 min-h-0"
+        :class="
+          multiline
+            ? 'nc-calendar-vcard-fields flex flex-col gap-0.5 w-full overflow-hidden flex-1 min-h-0'
+            : 'nc-calendar-vcard-inline truncate w-full overflow-hidden'
+        "
       >
         <template #title>
-          <div class="nc-calendar-card-tooltip-fields flex flex-col gap-1 text-left">
+          <div class="nc-calendar-card-tooltip-fields flex flex-col gap-2 text-left">
             <slot />
           </div>
         </template>
         <slot />
       </NcTooltip>
-      <div v-else class="truncate">
-        <NcTooltip
-          class="break-word whitespace-nowrap overflow-hidden text-ellipsis pr-1"
-          show-on-truncate-only
-          :disabled="selected"
-        >
-          <template #title>
-            <slot />
-          </template>
-          <slot />
-        </NcTooltip>
-      </div>
 
       <div class="flex-shrink-0">
         <slot name="time" />
