@@ -1273,6 +1273,14 @@ watch(
                     :underline="!!fieldStyles[field.id]?.underline"
                   />
                 </template>
+                <template #tooltip>
+                  <template v-for="(field, id) in fields" :key="id">
+                    <div v-if="!isRowEmpty(record, field!)" class="nc-calendar-tooltip-field">
+                      <div class="nc-calendar-tooltip-label">{{ field!.title }}</div>
+                      <LazySmartsheetPlainCell v-model="record.row[field!.title!]" :column="field" />
+                    </div>
+                  </template>
+                </template>
                 <template #time>
                   <div class="text-xs font-medium text-nc-content-gray-disabled">
                     {{ timezoneDayjs.timezonize(record.row[record.rowMeta.range?.fk_from_col!.title!]).format('h:mm a') }}

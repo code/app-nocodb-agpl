@@ -85,7 +85,9 @@ const rowColorInfo = computed(() => {
       >
         <template #title>
           <div class="nc-calendar-card-tooltip-fields flex flex-col gap-2 text-left">
-            <slot />
+            <slot name="tooltip">
+              <slot />
+            </slot>
           </div>
         </template>
         <slot />
@@ -155,8 +157,19 @@ const rowColorInfo = computed(() => {
     }
   }
 
-  .plain-cell:first-child {
-    font-weight: 600;
+  // Each field shows its name as a small muted label above the value, so a value
+  // like "8" is clearly "Number: 8" rather than an anonymous number.
+  .nc-calendar-tooltip-field {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .nc-calendar-tooltip-label {
+    font-size: 11px;
+    line-height: 14px;
+    font-weight: 500;
+    opacity: 0.6;
   }
 }
 </style>
