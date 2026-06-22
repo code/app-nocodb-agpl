@@ -1,7 +1,12 @@
 <script lang="ts" setup>
 import dayjs from 'dayjs'
 import type { ColumnType } from 'nocodb-sdk'
-import { CALENDAR_CARD_MAX_FIELDS, cardHeightForFieldCount, computeColumnPackedLayout } from '../calendarRecordCardHeight'
+import {
+  CALENDAR_CARD_MAX_FIELDS,
+  CALENDAR_CARD_ROW_GAP,
+  cardHeightForFieldCount,
+  computeColumnPackedLayout,
+} from '../calendarRecordCardHeight'
 import type { Row } from '~/lib/types'
 
 const emits = defineEmits(['expandRecord', 'newRecord'])
@@ -18,6 +23,7 @@ const {
   updateFormat,
   isSyncedFromColumn,
   activeCalendarView,
+  recordHeightMode,
 } = useCalendarViewStoreOrThrow()
 
 const { isSyncedTable } = useSmartsheetStoreOrThrow()
@@ -235,6 +241,7 @@ const calendarData = computed(() => {
           range: { fk_from_col, fk_to_col },
           position,
           id,
+          rowIndex: suitableRow,
           spanningDays: Math.abs(ogStartDate.diff(endDate, 'day')) - Math.abs(startDate.diff(endDate, 'day')),
           // Stashed for the post-pass that packs cards down each column.
           suitableRow,
@@ -297,6 +304,30 @@ const calendarData = computed(() => {
   })
 
   return recordsInRange
+})
+
+// --- Compact / Expanded record height ---------------------------------------
+// Compact (default): the grid is locked to the viewport height and records scroll
+// inside the overlay. Expanded: the grid grows to fit the tallest day's stack so
+// every record is visible and the page scrolls instead.
+const isExpanded = computed(() => recordHeightMode.value === 'expanded')
+
+// Height needed to show every card in the tallest column. Cards are variable-height and
+// packed by computeColumnPackedLayout (their final `top` + `cardHeight` live on rowMeta),
+// so the content bottom is the max of `top + cardHeight` across all records, plus a gap.
+const contentHeight = computed(() => {
+  let maxBottom = 0
+  for (const record of calendarData.value) {
+    const top = Number.parseFloat(record.rowMeta.style?.top as string) || 0
+    const height = (record.rowMeta as { cardHeight?: number }).cardHeight ?? 0
+    if (top + height > maxBottom) maxBottom = top + height
+  }
+  return maxBottom + CALENDAR_CARD_ROW_GAP
+})
+
+const gridStyle = computed(() => {
+  if (!isExpanded.value) return undefined
+  return { height: `max(calc(100vh - 7.3rem), ${contentHeight.value}px)` }
 })
 
 const dragElement = ref<HTMLElement | null>(null)
@@ -654,23 +685,32 @@ const addRecord = (date: dayjs.Dayjs) => {
         {{ dayjs(date).format('DD ddd') }}
       </div>
     </div>
-    <div ref="container" class="flex h-[calc(100vh-7.3rem)] w-full">
+    <div
+      ref="container"
+      class="flex w-full"
+      :class="isExpanded ? 'min-h-[calc(100vh-7.3rem)]' : 'h-[calc(100vh-7.3rem)]'"
+      :style="gridStyle"
+    >
       <div
         v-for="(date, dateIndex) in weekDates"
         :key="dateIndex"
-        :class="{
-          'selected-date': dayjs(date).isSame(selectedDate, 'day'),
-          '!bg-nc-bg-gray-extralight': date.get('day') === 0 || date.get('day') === 6,
-        }"
+        :class="[
+          {
+            'selected-date': dayjs(date).isSame(selectedDate, 'day'),
+            '!bg-nc-bg-gray-extralight': date.get('day') === 0 || date.get('day') === 6,
+          },
+          isExpanded ? 'min-h-full' : 'min-h-[100vh]',
+        ]"
         :style="{ width: columnWidthPct(dateIndex) }"
-        class="flex cursor-pointer flex-col border-r-1 min-h-[100vh] last:border-r-0 items-center"
+        class="flex cursor-pointer flex-col border-r-1 last:border-r-0 items-center"
         data-testid="nc-calendar-week-day"
         @click="selectDate(date)"
         @dblclick="addRecord(date)"
       ></div>
     </div>
     <div
-      class="absolute nc-scrollbar-md overflow-y-auto z-2 mt-6 pointer-events-none inset-0"
+      class="absolute z-2 mt-6 pointer-events-none inset-0"
+      :class="isExpanded ? 'overflow-visible' : 'nc-scrollbar-md overflow-y-auto'"
       data-testid="nc-calendar-week-record-container"
     >
       <template v-for="(record, id) in calendarData" :key="id">
