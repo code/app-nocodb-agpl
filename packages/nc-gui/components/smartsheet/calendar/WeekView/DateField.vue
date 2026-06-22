@@ -60,12 +60,24 @@ const getFieldStyle = (field: ColumnType) => {
   return fieldStyles.value.get(field.id)
 }
 
-// Non-empty visible fields a card actually shows, capped so the card never
-// renders a partially-clipped (half-cut) line. The card height is derived from
-// the same list, so what's rendered always fits.
+// All non-empty visible fields for a record.
+const nonEmptyCardFields = (record: Row) => (fields.value ?? []).filter((f) => f && !isRowEmpty(record, f))
+
+// Fields actually rendered on the card. When there are more than the cap, the
+// last line is reserved for a "+N more" hint, so we render one fewer field.
 const cardFields = (record: Row) => {
-  return (fields.value ?? []).filter((f) => f && !isRowEmpty(record, f)).slice(0, CALENDAR_CARD_MAX_FIELDS)
+  const all = nonEmptyCardFields(record)
+  return all.length > CALENDAR_CARD_MAX_FIELDS ? all.slice(0, CALENDAR_CARD_MAX_FIELDS - 1) : all
 }
+
+// Count of non-empty fields not shown on the card (0 when everything fits).
+const hiddenFieldCount = (record: Row) => {
+  const total = nonEmptyCardFields(record).length
+  return total > CALENDAR_CARD_MAX_FIELDS ? total - (CALENDAR_CARD_MAX_FIELDS - 1) : 0
+}
+
+// Lines the card renders: the shown fields plus the "+N more" line, if any.
+const cardLineCount = (record: Row) => cardFields(record).length + (hiddenFieldCount(record) > 0 ? 1 : 0)
 
 // Calculate the dates of the week
 const weekDates = computed(() => {
@@ -214,7 +226,7 @@ const calendarData = computed(() => {
 
       // Card height grows with the number of non-empty visible fields (capped),
       // so week-view cards can show several fields over multiple lines.
-      const cardHeight = cardHeightForFieldCount(cardFields(record).length)
+      const cardHeight = cardHeightForFieldCount(cardLineCount(record))
 
       recordsInRange.push({
         ...record,
@@ -697,6 +709,12 @@ const addRecord = (date: dayjs.Dayjs) => {
                   :underline="getFieldStyle(field).underline"
                 />
               </template>
+              <div
+                v-if="hiddenFieldCount(record) > 0"
+                class="nc-calendar-card-more truncate leading-5 text-bodySm text-nc-content-gray-muted"
+              >
+                +{{ hiddenFieldCount(record) }} more
+              </div>
             </LazySmartsheetCalendarRecordCard>
           </LazySmartsheetRow>
         </div>
