@@ -112,14 +112,15 @@ function sanitizeSortValue(
  *
  * The restriction must match the fetch's actual SELECT exposure so the predicate and
  * the SELECT never disagree about what's visible — which differs by path:
- *  - `accessBasedExposure: true` (the EE optimized list path) SELECTs the full column
- *    set whenever the user has visibility access (`extractOnlyPrimaries:
- *    hasLimitedAccess`). There the gate is purely visibility access — a cross-base
- *    link whose related table the user CAN see exposes everything, so its `where`/
- *    `sort` apply unchanged (restricting it would silently drop legitimate filters on
- *    shown columns, e.g. searching the picker by a displayed non-pv field). Access is
- *    resolved in the related table's own context so cross-base roles are evaluated
- *    correctly.
+ *  - when the caller threads in `hasLimitedAccess` (the EE optimized list path, which
+ *    SELECTs the full column set whenever the user has visibility access —
+ *    `extractOnlyPrimaries: hasLimitedAccess`): the gate is exactly that same value,
+ *    so a cross-base link whose related table the user CAN see exposes everything and
+ *    its `where`/`sort` apply unchanged (restricting it would silently drop legitimate
+ *    filters on shown columns, e.g. searching the picker by a displayed non-pv field).
+ *    The caller computes that access in the related table's own context, so cross-base
+ *    roles are evaluated correctly and the predicate and SELECT resolve visibility from
+ *    a single source.
  *  - default (CE fetcher, public shared view, legacy routes) SELECTs pk/pv-only for
  *    ANY cross-base link OR any visibility-limited table, independent of the caller's
  *    incidental access (`pkAndPvOnly: isCrossBaseLink() || hasLimitedAccess`, and the
@@ -150,13 +151,14 @@ export async function restrictNestedLinkQuery(
   query: Record<string, any>,
   options?: {
     /**
-     * Set by callers whose SELECT exposure follows visibility access alone (the EE
-     * optimized list path's `extractOnlyPrimaries: hasLimitedAccess`). The gate then
-     * mirrors that exactly — restrict only when the user lacks access — so a
-     * cross-base link the user can see stays fully filterable. Omitted everywhere
-     * else, where the conservative cross-base gate is required (see fn docs).
+     * Precomputed "user lacks visibility access to the related table" decision,
+     * threaded from the caller's SELECT exposure (the EE optimized list path's
+     * `extractOnlyPrimaries: hasLimitedAccess`). When provided, the where/sort is
+     * restricted iff this is true — resolving access once, from the same source as
+     * the SELECT, so the predicate and the SELECT can't disagree. Omitted everywhere
+     * else, where the conservative cross-base gate is computed here (see fn docs).
      */
-    accessBasedExposure?: boolean;
+    hasLimitedAccess?: boolean;
   },
 ): Promise<void> {
   if (!query) return;
@@ -164,19 +166,25 @@ export async function restrictNestedLinkQuery(
   // Nothing to sanitize — skip the access check and column lookup entirely.
   if (!query.where && !query.sort) return;
 
-  // The related table may live in another base — resolve its own context for both
-  // the visibility check and the column lookup.
+  // The related table may live in another base — resolve its own context for the
+  // column lookup below.
   const { refContext } = colOptions.getRelContext(context);
 
   // Gate the restriction to the fetch's actual SELECT exposure (see fn docs):
-  //  - accessBasedExposure: restrict iff the user lacks visibility access, checked
-  //    in the related table's own context (matches the EE optimized SELECT);
+  //  - when the caller threads in `hasLimitedAccess` (the EE optimized SELECT's own
+  //    access decision): restrict iff the user lacks access — the same value the
+  //    SELECT uses, so the two can't disagree;
   //  - default: restrict for any cross-base link or visibility-limited table —
   //    conservative, and keeps the anonymous public path (no user) restricted.
-  const restricted = options?.accessBasedExposure
-    ? !(await hasTableVisibilityAccess(refContext, relatedModel.id, context.user))
-    : colOptions.isCrossBaseLink() ||
-      !(await hasTableVisibilityAccess(context, relatedModel.id, context.user));
+  const restricted =
+    options?.hasLimitedAccess !== undefined
+      ? options.hasLimitedAccess
+      : colOptions.isCrossBaseLink() ||
+        !(await hasTableVisibilityAccess(
+          context,
+          relatedModel.id,
+          context.user,
+        ));
 
   if (!restricted) return;
 
@@ -232,7 +240,7 @@ export async function restrictNestedLinkQueryForColumn(
   context: NcContext,
   column: Column,
   query: Record<string, any>,
-  options?: { accessBasedExposure?: boolean },
+  options?: { hasLimitedAccess?: boolean },
 ): Promise<void> {
   if (!query || !column || !isLinksOrLTAR(column)) return;
 
