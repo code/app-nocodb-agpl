@@ -6419,6 +6419,15 @@ export class ColumnsService implements IColumnsService {
       id: ltarReq.childId,
     });
 
+    // Fail fast if the related table can't be resolved in the target base —
+    // e.g. a missing/incorrect `ref_base_id` for a cross-base link, or a stale
+    // `childId`. Without this guard the `!refTable.primaryKey` check below
+    // dereferences null and throws an opaque 500
+    // (`Cannot read properties of null (reading 'primaryKey')`).
+    if (!refTable) {
+      NcError.get(context).tableNotFound(ltarReq.childId);
+    }
+
     // Both sides need a primary key for the relation to be usable.
     // Without one, downstream operations (delByPk LMT broadcast, BT/OO
     // nested-record JSON construction, undo) can't address rows by id and
