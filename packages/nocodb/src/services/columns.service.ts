@@ -6419,6 +6419,15 @@ export class ColumnsService implements IColumnsService {
       id: ltarReq.childId,
     });
 
+    // Fail fast if the related table can't be resolved in the target base —
+    // e.g. a missing/incorrect `ref_base_id` for a cross-base link, or a stale
+    // `childId`. Without this guard the `!refTable.primaryKey` check below
+    // dereferences null and throws an opaque 500
+    // (`Cannot read properties of null (reading 'primaryKey')`).
+    if (!refTable) {
+      NcError.get(context).tableNotFound(ltarReq.childId);
+    }
+
     // Both sides need a primary key for the relation to be usable.
     // Without one, downstream operations (delByPk LMT broadcast, BT/OO
     // nested-record JSON construction, undo) can't address rows by id and
@@ -7509,18 +7518,21 @@ export class ColumnsService implements IColumnsService {
 
     if (colOptions.fk_mm_model_id === tableId) {
       table = await colOptions.getMMModel(mmContext);
-      // Column is already validated as Link/LTAR with loaded colOptions, so the
-      // referenced model should always exist. A null means orphaned link
-      // metadata (table deleted without cleaning up the link column) — an
-      // internal data-integrity violation. Throw 500 with enough context to
-      // trace the broken column rather than dereferencing null.
+      // A null means orphaned link metadata: the related table was deleted
+      // without cleaning up this link column. Surface a clear, actionable
+      // message that NAMES the offending field (not an opaque 500) so the user
+      // can fix it, and log the ids for tracing.
       if (!table) {
-        NcError.get(context).internalServerError(
-          `Link column metadata references a missing many-to-many table: ` +
-            `mm_model_id=${colOptions.fk_mm_model_id}, ` +
-            `link_column_id=${columnId} (${column?.title}), ` +
-            `source_model_id=${column?.fk_model_id}, ` +
-            `relation=${colOptions.type}`,
+        this.logger.warn(
+          `Orphaned link column ${columnId} (${column?.title}) on model ` +
+            `${column?.fk_model_id}: missing mm table mm_model_id=` +
+            `${colOptions.fk_mm_model_id}, relation=${colOptions.type}`,
+        );
+        NcError.get(context).badRequest(
+          `The linked field '${
+            column?.title ?? columnId
+          }' points to a table that no longer exists (it may have been ` +
+            `deleted). Delete or recreate this field to continue.`,
         );
       }
       // load columns
@@ -7528,12 +7540,16 @@ export class ColumnsService implements IColumnsService {
     } else if (colOptions.fk_related_model_id === tableId) {
       table = await colOptions.getRelatedTable(refContext);
       if (!table) {
-        NcError.get(context).internalServerError(
-          `Link column metadata references a missing related table: ` +
-            `related_model_id=${colOptions.fk_related_model_id}, ` +
-            `link_column_id=${columnId} (${column?.title}), ` +
-            `source_model_id=${column?.fk_model_id}, ` +
-            `relation=${colOptions.type}`,
+        this.logger.warn(
+          `Orphaned link column ${columnId} (${column?.title}) on model ` +
+            `${column?.fk_model_id}: missing related table related_model_id=` +
+            `${colOptions.fk_related_model_id}, relation=${colOptions.type}`,
+        );
+        NcError.get(context).badRequest(
+          `The linked field '${
+            column?.title ?? columnId
+          }' points to a table that no longer exists (it may have been ` +
+            `deleted). Delete or recreate this field to continue.`,
         );
       }
       // load columns
