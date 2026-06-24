@@ -11775,6 +11775,11 @@
           "show_as_progress": {
             "type": "boolean",
             "description": "Display as a progress bar."
+          },
+          "shape": {
+            "type": "string",
+            "enum": ["bar", "circle"],
+            "description": "Progress bar shape. Only applies when `show_as_progress` is enabled.\n- `bar` (default)\n- `circle`"
           }
         },
         "additionalProperties": false
