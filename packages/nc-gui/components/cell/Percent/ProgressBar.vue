@@ -42,7 +42,10 @@ const slotHasChildren = (name?: string) => {
     <div class="progress-bar-input" :class="slotHasChildren() ? 'has-child' : ''">
       <slot></slot>
     </div>
-    <div class="progress-bar flex items-center gap-2 w-full h-full" :class="{ 'min-h-[16px]': isShowNumber }">
+    <div
+      class="progress-bar flex items-center gap-2 w-full h-full"
+      :class="{ 'min-h-[16px]': isShowNumber, 'px-2': isShowNumber && shape === 'circle' }"
+    >
       <template v-if="shape === 'circle'">
         <span
           class="nc-percent-progress-circle inline-flex shrink-0"
