@@ -41,13 +41,14 @@ export const PercentCellRenderer: CellRenderer = {
           ctx.lineCap = 'butt'
         }
 
-        // percentage label, right-aligned (matches the bar layout)
+        // percentage label, positioned just right of the ring (reads as one unit)
+        const labelX = cx + radius + 8
         renderSingleLineText(ctx, {
-          x: x + width - padding,
+          x: labelX,
           y,
           text: !ncIsNaN(value) ? formatPercentage(value, Math.min(meta.precision, 2)) : '',
-          textAlign: 'right',
-          maxWidth: Math.max(0, width - padding * 2 - radius * 2 - 4),
+          textAlign: 'left',
+          maxWidth: Math.max(0, x + width - padding - labelX),
           fontFamily: `${pv ? 600 : 500} 12px Inter`,
           fillStyle: pv ? getColor(themeV4Colors.brand['500']) : getColor(textColor),
           height,
