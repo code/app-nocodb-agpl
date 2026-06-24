@@ -18,7 +18,9 @@ export const PercentCellRenderer: CellRenderer = {
       if (meta.shape === 'circle') {
         const radius = Math.max(4, Math.min(8, Math.floor((height - 12) / 2)))
         const cx = x + padding + radius
-        const cy = y + height / 2
+        // Top-anchored to match the bar (barY 14 + barHeight 4 / 2 = 16) and the
+        // label, so tall rows keep the ring at the top instead of centering it.
+        const cy = y + 16
 
         // background track ring
         ctx.beginPath()
