@@ -495,7 +495,13 @@ export class DataTableService {
       context,
     );
 
-    const relatedModel = await colOptions.getRelatedTable(context);
+    // The related table may live in another base (cross-base link). Build the
+    // projection in the related table's own context — otherwise `getAst` loads its
+    // columns under the parent base, resolves none, and `nocoExecute` below strips
+    // every field (returning empty `{}` records). Mirrors `getLinkedDataList`.
+    const { refContext } = colOptions.getRelContext(context);
+
+    const relatedModel = await colOptions.getRelatedTable(refContext);
 
     // Strip caller-supplied where/sort references to columns the link doesn't expose
     // (cross-base / visibility-limited related tables). Both the data fetch and the
@@ -507,7 +513,7 @@ export class DataTableService {
       param.query,
     );
 
-    const { ast, dependencyFields } = await getAst(context, {
+    const { ast, dependencyFields } = await getAst(refContext, {
       model: relatedModel,
       query: param.query,
       extractOnlyPrimaries: !(param.query?.f || param.query?.fields),
