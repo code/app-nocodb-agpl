@@ -227,7 +227,7 @@ const [useProvideSharedFormStore, useSharedFormStore] = useInjectionState((share
       loadAllviewFilters(Array.isArray(viewMeta?.filter?.children) ? viewMeta?.filter?.children : [])
 
       const _sharedViewMeta = (viewMeta as any).meta
-      sharedViewMeta.value = isString(_sharedViewMeta) ? JSON.parse(_sharedViewMeta) : _sharedViewMeta
+      sharedViewMeta.value = (isString(_sharedViewMeta) ? JSON.parse(_sharedViewMeta) : _sharedViewMeta) ?? {}
 
       await setMeta(viewMeta.model)
 
