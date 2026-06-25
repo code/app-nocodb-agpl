@@ -57,6 +57,7 @@ export const RollupCellRenderer: CellRenderer = {
 
       if (colMeta?.display_type) {
         isFormulaWithDisplayType = true
+        const displayColumnMeta = parseProp(colMeta.display_column_meta)
         const effectiveCol = getEffectiveDisplayColumn(colMeta, childColumn)
 
         renderProps = {
@@ -64,7 +65,7 @@ export const RollupCellRenderer: CellRenderer = {
           column: {
             ...effectiveCol,
             meta: {
-              ...parseProp(effectiveCol.meta),
+              ...parseProp(displayColumnMeta?.meta),
               ...getRollupColumnMeta(column?.meta, colMeta?.display_type, colOptions?.rollup_function),
             },
           },

@@ -77,12 +77,16 @@ export class RollupHelper extends AbstractColumnHelper {
         isFormulaWithDisplayType = true;
 
         // Resolve the formula's display_type into the effective child column, then
-        // layer the rollup-specific meta on top of the display format meta.
+        // layer the rollup-specific meta on top of the display format meta. Base the
+        // meta on display_column_meta.meta explicitly (not the effective column's
+        // meta) so it stays {} when display_column_meta has no `meta` key — otherwise
+        // the formula's own meta would leak in.
+        const displayColumnMeta = parseProp(colMeta.display_column_meta);
         childColumn = getEffectiveDisplayColumn(colMeta, childColumn);
         childColumn = {
           ...childColumn,
           meta: {
-            ...parseProp(childColumn.meta),
+            ...parseProp(displayColumnMeta?.meta),
             ...getRollupColumnMeta(
               col?.meta,
               colMeta.display_type,

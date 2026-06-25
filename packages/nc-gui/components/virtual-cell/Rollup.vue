@@ -53,12 +53,13 @@ const childColumn = computed(() => {
   if (col.uidt === UITypes.Formula) {
     const colMeta = parseProp(col.meta)
     if (colMeta?.display_type) {
+      const displayColumnMeta = parseProp(colMeta.display_column_meta)
       const effectiveCol = getEffectiveDisplayColumn(colMeta, col)
 
       return {
         ...effectiveCol,
         meta: {
-          ...parseProp(effectiveCol.meta),
+          ...parseProp(displayColumnMeta?.meta),
           ...getRollupColumnMeta(
             column.value?.meta,
             colMeta.display_type,
