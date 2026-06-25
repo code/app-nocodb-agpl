@@ -1188,6 +1188,9 @@ const expandRecord = (record: Row) => {
                   <template v-else>
                     <span class="text-nc-content-gray-muted"> - </span>
                   </template>
+                  <template #tooltip>
+                    <SmartsheetRecordFieldsTooltip :record="record" :fields="fields" />
+                  </template>
                 </LazySmartsheetCalendarSideRecordCard>
               </div>
             </template>
