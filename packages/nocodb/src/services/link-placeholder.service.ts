@@ -577,6 +577,19 @@ export class LinkPlaceholderService {
       ]);
       if (!childCol || !parentCol) return;
 
+      // The FK (child) column physically lives on the relation's "owner" side.
+      // For BT — and the OO side that holds the FK (`meta.bt`) — that's the
+      // table being updated (srcTn), so the join is `srcTn.fk = rel.pk`. For
+      // the OO side that does NOT hold the FK, the FK sits on the related
+      // table, so the join must flip to `srcTn.pk = rel.fk`. Without flipping,
+      // the query references the FK column on srcTn where it doesn't exist
+      // (e.g. `RA.RA_id` for an `RA`-owned `id` referenced by `RB.RA_id`).
+      // Deriving orientation from the FK column's `fk_model_id` covers every
+      // case without inspecting the OO `meta.bt` flag.
+      const fkOnSrc = childCol.fk_model_id === table.id;
+      const srcJoinCol = fkOnSrc ? childCol.column_name : parentCol.column_name;
+      const relJoinCol = fkOnSrc ? parentCol.column_name : childCol.column_name;
+
       // Alias the relation side so self-referential BT/OO works
       // (PG rejects `UPDATE T ... FROM T` and MySQL joins need distinct names).
       // Virtual pv (Knex QB) would reference the original table name inside its
@@ -595,13 +608,13 @@ export class LinkPlaceholderService {
         await baseModel.execAndParse(
           `UPDATE ${srcTn} JOIN ${relTn} AS ${relAliasQ} ON ${qCol(
             srcTn,
-            childCol.column_name,
-          )} = ${relAliasQ}.${qi(parentCol.column_name)} SET ${qCol(
+            srcJoinCol,
+          )} = ${relAliasQ}.${qi(relJoinCol)} SET ${qCol(
             srcTn,
             phCn,
           )} = ${pvExprAliased} WHERE ${qCol(
             srcTn,
-            childCol.column_name,
+            srcJoinCol,
           )} IS NOT NULL`,
           null,
           { raw: true },
@@ -615,10 +628,10 @@ export class LinkPlaceholderService {
           `UPDATE ${srcTn} SET ${qi(
             phCn,
           )} = (SELECT ${pvExprAliased} FROM ${relTn} ${relFromAs}${relAliasQ} WHERE ${relAliasQ}.${qi(
-            parentCol.column_name,
-          )} = ${qCol(srcTn, childCol.column_name)}) WHERE ${qCol(
+            relJoinCol,
+          )} = ${qCol(srcTn, srcJoinCol)}) WHERE ${qCol(
             srcTn,
-            childCol.column_name,
+            srcJoinCol,
           )} IS NOT NULL`,
           null,
           { raw: true },
@@ -629,10 +642,10 @@ export class LinkPlaceholderService {
             phCn,
           )} = ${pvExprAliased} FROM ${relTn} AS ${relAliasQ} WHERE ${qCol(
             srcTn,
-            childCol.column_name,
-          )} = ${relAliasQ}.${qi(parentCol.column_name)} AND ${qCol(
+            srcJoinCol,
+          )} = ${relAliasQ}.${qi(relJoinCol)} AND ${qCol(
             srcTn,
-            childCol.column_name,
+            srcJoinCol,
           )} IS NOT NULL`,
           null,
           { raw: true },
