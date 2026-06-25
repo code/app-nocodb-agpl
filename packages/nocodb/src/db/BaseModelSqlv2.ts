@@ -7078,29 +7078,37 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
     _perf?.mark('json');
 
     if (options.bulkAggregate) {
-      data = data.map(async (d) => {
-        for (const key in d) {
-          let data = d[key];
+      data = await Promise.all(
+        data.map(async (d) => {
+          for (const key in d) {
+            let value = d[key];
 
-          if (typeof data === 'string' && data.startsWith('{')) {
-            try {
-              data = JSON.parse(data);
-            } catch (e) {
-              // do nothing
+            if (typeof value === 'string' && value.startsWith('{')) {
+              try {
+                value = JSON.parse(value);
+              } catch (e) {
+                // not JSON — keep as-is
+              }
             }
-          }
 
-          d[key] =
-            (
-              await this.substituteColumnIdsWithColumnTitles(
-                [data],
-                dependencyColumns,
-                aliasColumns,
-              )
-            )[0] ?? {};
-        }
-        return d;
-      });
+            // Only nested object aggregate values carry column-id keys that
+            // need rewriting to titles; scalar results (count/sum/…) pass
+            // through untouched. Substitution rebuilds a non-object as a
+            // keyless `{}` (e.g. a number → `{}`), so guard on object-ness.
+            d[key] =
+              value && typeof value === 'object'
+                ? (
+                    await this.substituteColumnIdsWithColumnTitles(
+                      [value],
+                      dependencyColumns,
+                      aliasColumns,
+                    )
+                  )[0] ?? value
+                : value;
+          }
+          return d;
+        }),
+      );
     }
 
     if (options.apiVersion === NcApiVersion.V3) {
@@ -7271,6 +7279,10 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
 
     // Transform data in a single pass
     return data.map((item) => {
+      if (item === null || typeof item !== 'object') {
+        return item;
+      }
+
       const transformedItem = {};
 
       Object.entries(item).forEach(([key, value]) => {

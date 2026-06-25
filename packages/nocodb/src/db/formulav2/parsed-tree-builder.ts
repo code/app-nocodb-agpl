@@ -118,6 +118,23 @@ export const callExpressionBuilder = async ({
           model,
         });
         if (res) return res;
+      } else if (knex.clientType() === 'oracledb') {
+        // The generic assembler below emits a literal n-ary `CONCAT(a, b, …)`.
+        // Oracle 23ai accepts that syntax, but it returns VARCHAR2 (capped at
+        // 4000 / 32767 bytes), so a large concatenation raises ORA-01489
+        // ("result of string concatenation is too long") — whereas pg/mysql
+        // build an unlimited TEXT result. Route through the oracle function
+        // mapping instead, which chains the operands with `||` and wraps each
+        // in TO_CLOB() so the result is an (unlimited) CLOB.
+        const res = await mapFunctionName({
+          pt,
+          knex,
+          aliasToCol: aliasToColumn,
+          fn,
+          prevBinaryOp,
+          model,
+        });
+        if (res) return res;
       }
       break;
     case 'URL':
