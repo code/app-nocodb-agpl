@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import {
   AppEvents,
   ClientType,
@@ -171,9 +171,14 @@ export class MetaDiffsService {
       return [];
     }
 
+    // [DBG meta-diff-timing] TEMPORARY — Oracle reload-stall investigation (#9214/#9405). Remove later.
+    const _dbgT0 = Date.now();
+    const _dbgLog = new Logger('MetaDiffTiming');
+
     const changes: Array<MetaDiff> = [];
     const virtualRelationColumns: Column<LinkToAnotherRecordColumn>[] = [];
 
+    const _dbgTableT0 = Date.now();
     // @ts-ignore
     const tableList: Array<{ tn: string }> = (
       await sqlClient.tableList({ schema: source.getConfig()?.schema })
@@ -183,6 +188,12 @@ export class MetaDiffsService {
       }
       return true;
     });
+
+    _dbgLog.warn(
+      `[DBG meta-diff] tableList ms=${Date.now() - _dbgTableT0} tables=${
+        tableList?.length ?? 0
+      } source=${source.id} client=${source.type}`,
+    );
 
     const colListRef = {};
     const oldMetas = await source.getModels(context);
@@ -195,6 +206,7 @@ export class MetaDiffsService {
       else if (model.type === ModelTypes.VIEW) oldViewMetas.push(model);
     }
 
+    const _dbgRelT0 = Date.now();
     // @ts-ignore
     const relationList: Array<{
       tn: string;
@@ -207,7 +219,11 @@ export class MetaDiffsService {
     }> = (
       await sqlClient.relationListAll({ schema: source.getConfig()?.schema })
     )?.data?.list;
+    _dbgLog.warn(
+      `[DBG meta-diff] relationListAll ms=${Date.now() - _dbgRelT0}`,
+    );
 
+    const _dbgColLoopT0 = Date.now();
     for (const table of tableList) {
       if (table.tn === 'nc_evolutions') continue;
 
@@ -823,6 +839,14 @@ export class MetaDiffsService {
         ],
       });
     }
+
+    _dbgLog.warn(
+      `[DBG meta-diff] DONE columnLoop+rest ms=${
+        Date.now() - _dbgColLoopT0
+      } TOTAL ms=${Date.now() - _dbgT0} tables=${
+        tableList?.length ?? 0
+      } source=${source.id}`,
+    );
 
     return changes;
   }
