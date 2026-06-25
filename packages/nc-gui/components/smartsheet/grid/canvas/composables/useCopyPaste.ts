@@ -28,6 +28,10 @@ import type { ActionManager } from '../loaders/ActionManager'
 
 const MAX_ROWS = 5000
 
+// Backend `nestedBulkLinkByDisplayValueReq` caps each request at 100 entries —
+// chunk multi-row link-by-display-value pastes so larger selections still apply.
+const LINK_BY_DISPLAY_VALUE_BATCH_SIZE = 100
+
 export interface BulkLtarOp {
   columnId: string
   columnTitle: string
@@ -617,16 +621,21 @@ export function useCopyPaste({
         // Execute text-based LTAR link-by-display-value operations
         if (textLtarOps.length) {
           try {
-            await $api.internal.postOperation(
-              meta.value?.fk_workspace_id as string,
-              meta.value?.base_id as string,
-              {
-                operation: 'nestedDataBulkLinkByDisplayValue',
-                tableId: meta.value?.id as string,
-                viewId: view?.value?.id,
-              },
-              textLtarOps.map(({ columnId, rowId, displayValues }) => ({ columnId, rowId, displayValues })),
-            )
+            const entries = textLtarOps.map(({ columnId, rowId, displayValues }) => ({ columnId, rowId, displayValues }))
+
+            // Chunk into batches to stay within the backend per-request entry cap
+            for (let i = 0; i < entries.length; i += LINK_BY_DISPLAY_VALUE_BATCH_SIZE) {
+              await $api.internal.postOperation(
+                meta.value?.fk_workspace_id as string,
+                meta.value?.base_id as string,
+                {
+                  operation: 'nestedDataBulkLinkByDisplayValue',
+                  tableId: meta.value?.id as string,
+                  viewId: view?.value?.id,
+                },
+                entries.slice(i, i + LINK_BY_DISPLAY_VALUE_BATCH_SIZE),
+              )
+            }
 
             reloadViewDataHook?.trigger({ shouldShowLoading: false })
           } catch (e: any) {
