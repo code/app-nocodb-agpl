@@ -1,6 +1,6 @@
 import { FormulaDataTypes } from 'nocodb-sdk';
-import { NC_MAX_TEXT_LENGTH } from '~/constants';
 import type CustomKnex from '~/db/CustomKnex';
+import { NC_MAX_TEXT_LENGTH } from '~/constants';
 
 export interface IGetAggregateFn {
   (fnName: string): (args: { qb; knex?: CustomKnex; cn }) => any;
@@ -104,6 +104,20 @@ export const wrapFormulaWithMaxLength = ({
       return knex.raw(`SUBSTRING(CAST(? AS NVARCHAR(MAX)), 1, ${len})`, [
         builder,
       ]);
+    case 'oracledb':
+      // Oracle reads `CAST(x AS CHAR)` (the mysql default below) as CHAR(1),
+      // truncating every value to one character; and a string formula is a CLOB
+      // here, which can't be used in GROUP BY / DISTINCT / `=` (ORA-22849).
+      // DBMS_LOB.SUBSTR(TO_CLOB(x), n, 1) returns the first n chars as a plain,
+      // group-able VARCHAR2 (TO_CLOB is identity on CLOB/VARCHAR2/NUMBER). The
+      // amount is capped at 4000: a SQL VARCHAR2 is limited to 4000 bytes under
+      // the default MAX_STRING_SIZE (STANDARD), so a longer result raises
+      // ORA-06502 ("character string buffer too small"). 4000 is also the
+      // practical ceiling for a value that must be GROUP BY/DISTINCT-able.
+      return knex.raw(
+        `DBMS_LOB.SUBSTR(TO_CLOB(?), ${Math.min(len, 4000)}, 1)`,
+        [builder],
+      );
     case 'sqlite3':
       return knex.raw(`SUBSTR(CAST(? AS TEXT), 1, ${len})`, [builder]);
     case 'snowflake':
