@@ -624,6 +624,15 @@ export const groupBy = (baseModel: IBaseModelSqlV2, logger: Logger) => {
       return await baseModel.execAndParse(outerQb);
     }
 
+    if (baseModel.isOracle) {
+      // Oracle rejects the `) __nc_group_alias` derived-table wrap below — an
+      // unquoted identifier can't start with `_` (ORA-00911). knex's oracledb
+      // dialect already wraps the paginated query in its own ROWNUM subquery,
+      // and Oracle 23c accepts GROUP BY on a select alias inside the CTE, so
+      // execute outerQb directly like the mssql path.
+      return await baseModel.execAndParse(outerQb);
+    }
+
     return await baseModel.execAndParse(
       baseModel.dbDriver.from(
         baseModel.dbDriver.raw(outerQb).wrap('(', ') __nc_group_alias'),

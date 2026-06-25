@@ -6825,6 +6825,13 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
             column.column_name,
           ]),
         );
+      } else if (this.isOracle) {
+        // Oracle stores '' as NULL, so the COALESCE(NULLIF(col, '')) blank
+        // normalization is a no-op. Group by the raw column so it matches the
+        // `key` column selectObject projects verbatim — Oracle raises
+        // ORA-00979 ("must appear in the GROUP BY clause") when the selected
+        // column and the GROUP BY expression don't textually agree.
+        qb.groupBy(column.column_name);
       } else {
         qb.groupBy(
           this.dbDriver.raw(`COALESCE(NULLIF(??, ''), NULL)`, [
