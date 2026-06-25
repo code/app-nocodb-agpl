@@ -106,18 +106,14 @@ export const wrapFormulaWithMaxLength = ({
       ]);
     case 'oracledb':
       // Oracle reads `CAST(x AS CHAR)` (the mysql default below) as CHAR(1),
-      // truncating every value to one character; and a string formula is a CLOB
-      // here, which can't be used in GROUP BY / DISTINCT / `=` (ORA-22849).
-      // DBMS_LOB.SUBSTR(TO_CLOB(x), n, 1) returns the first n chars as a plain,
-      // group-able VARCHAR2 (TO_CLOB is identity on CLOB/VARCHAR2/NUMBER). The
-      // amount is capped at 4000: a SQL VARCHAR2 is limited to 4000 bytes under
-      // the default MAX_STRING_SIZE (STANDARD), so a longer result raises
-      // ORA-06502 ("character string buffer too small"). 4000 is also the
-      // practical ceiling for a value that must be GROUP BY/DISTINCT-able.
-      return knex.raw(
-        `DBMS_LOB.SUBSTR(TO_CLOB(?), ${Math.min(len, 4000)}, 1)`,
-        [builder],
-      );
+      // truncating every value to one character, and `CAST(<clob> AS CHAR)`
+      // raises ORA-25137. SUBSTR over TO_CLOB(x) keeps the result a CLOB (TO_CLOB
+      // is identity on CLOB/VARCHAR2/NUMBER), so it can carry the full
+      // NC_MAX_TEXT_LENGTH (100k) — a plain SQL VARCHAR2 caps at 4000/32767 and
+      // would truncate. A CLOB can't be used in GROUP BY / DISTINCT (ORA-22849),
+      // but no caller groups by the raw formula output: the widget category
+      // path narrows it to a VARCHAR2 separately (oracleWidgetCategoryExpr).
+      return knex.raw(`SUBSTR(TO_CLOB(?), 1, ${len})`, [builder]);
     case 'sqlite3':
       return knex.raw(`SUBSTR(CAST(? AS TEXT), 1, ${len})`, [builder]);
     case 'snowflake':
