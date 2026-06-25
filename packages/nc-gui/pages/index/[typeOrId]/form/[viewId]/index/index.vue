@@ -18,6 +18,10 @@ const {
   validate,
   fieldMappings,
   meta,
+  draftWasRestored,
+  draftRestoredAt,
+  discardDraft,
+  dismissDraftBanner,
 } = useSharedFormStoreOrThrow()
 
 const { isMobileMode } = storeToRefs(useConfigStore())
@@ -198,6 +202,13 @@ const { message: templatedMessage } = useTemplatedMessage(
           </GeneralOverlay>
 
           <div class="nc-form-wrapper">
+            <SmartsheetFormDraftRestoredBanner
+              v-if="draftWasRestored"
+              :restored-at="draftRestoredAt"
+              class="mb-4"
+              @discard="discardDraft"
+              @close="dismissDraftBanner"
+            />
             <a-form :model="formState">
               <div class="nc-form h-full">
                 <div class="flex flex-col gap-3 md:gap-6">
