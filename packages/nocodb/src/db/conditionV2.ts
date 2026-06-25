@@ -79,6 +79,31 @@ function formulaToTextCast(knex: any, expr: any) {
   return knex.raw('CAST((?) AS TEXT)', [expr]);
 }
 
+// Oracle: a STRING formula's compiled output is a CLOB — wrapFormulaWithMaxLength
+// wraps every string formula in `SUBSTR(TO_CLOB(...), 1, n)`. A CLOB can't be an
+// equality / ordering comparison key (ORA-22848: "cannot use CLOB type as
+// comparison key"), so `<formula> = 'x'` fails. Narrow it to a VARCHAR2 for the
+// comparison with DBMS_LOB.SUBSTR — the same proven CLOB→VARCHAR2 idiom used by
+// oracleWidgetCategoryExpr (4000 = the SQL VARCHAR2 limit, far beyond any label).
+// LIKE already accepts a CLOB operand, so only equality / ordering ops need this.
+// Caller gates this to Oracle (`clientType() === 'oracledb'`); only the
+// is-this-a-CLOB check (STRING formula) lives here, so a non-formula operand
+// (e.g. a numeric Rollup) is returned untouched.
+function oracleNarrowFormulaClobForCompare(
+  knex: any,
+  column: any,
+  expr: any,
+): any {
+  if (
+    column?.uidt === UITypes.Formula &&
+    (column?.colOptions as any)?.parsed_tree?.dataType ===
+      FormulaDataTypes.STRING
+  ) {
+    return knex.raw('DBMS_LOB.SUBSTR((?), 4000, 1)', [expr]);
+  }
+  return expr;
+}
+
 function getLogicalOpMethod(filter: Filter) {
   switch (filter.logical_op?.toLowerCase()) {
     case 'or':
@@ -438,6 +463,13 @@ const parseConditionV2 = async (
                   // mysql is case-insensitive for strings, turn to case-sensitive
                   qb = qb.where(knex.raw('BINARY ?? = ?', [field, val]));
                 }
+              } else if (knex.clientType() === 'oracledb') {
+                // Oracle: `val` holds a STRING formula's CLOB expression — narrow
+                // it so `'x' = <formula>` isn't a CLOB equality key (ORA-22848).
+                qb = qb.where(
+                  field,
+                  oracleNarrowFormulaClobForCompare(knex, column, val),
+                );
               } else {
                 qb = qb.where(field, val);
               }
@@ -461,8 +493,15 @@ const parseConditionV2 = async (
                   });
                 }
               } else {
+                // Oracle: narrow a STRING formula's CLOB so `<> 'x'` isn't a
+                // CLOB comparison key (ORA-22848). IS NULL still accepts a CLOB,
+                // so only the whereNot operand changes.
+                const cmpVal =
+                  knex.clientType() === 'oracledb'
+                    ? oracleNarrowFormulaClobForCompare(knex, column, val)
+                    : val;
                 qb = qb.where((nestedQb) => {
-                  nestedQb.whereNot(field, val);
+                  nestedQb.whereNot(field, cmpVal);
                   if (column.uidt !== UITypes.Links)
                     nestedQb.orWhereNull(customWhereClause ? _val : _field);
                 });

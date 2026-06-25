@@ -37,6 +37,27 @@ function logicalScalarSql(knex: MapFnArgs['knex'], predicates: string): string {
     : `(${predicates})`;
 }
 
+// Oracle: CONCAT / REPEAT lower a string to CLOB while literals and most scalar
+// string ops stay VARCHAR2. A CASE (IF / SWITCH) can't mix the two in its result
+// branches — ORA-00932 ("expression is of data type CLOB, which is incompatible
+// with expected data type CHAR"), since Oracle infers the CASE type from the
+// first branch and CLOB can't implicitly narrow to VARCHAR2. When at least one
+// branch is already a CLOB, wrap the other (VARCHAR2/NUMBER) branches in TO_CLOB
+// so every branch shares the CLOB type (TO_CLOB is identity on a CLOB). A CASE
+// with no CLOB branch is left untouched, so its result stays a plain VARCHAR2 —
+// keeping formula filters / sorts comparable.
+function unifyOracleClobCaseBranches(
+  knex: MapFnArgs['knex'],
+  branches: Array<Knex.Raw | undefined>,
+): Array<Knex.Raw | undefined> {
+  const producesClob = (b: Knex.Raw | undefined) =>
+    b != null && /\bto_clob\s*\(/i.test(b.toString());
+  if (!branches.some(producesClob)) return branches;
+  return branches.map((b) =>
+    b == null || producesClob(b) ? b : knex.raw('TO_CLOB(?)', [b]),
+  );
+}
+
 async function treatArgAsConditionalExp(
   args: MapFnArgs,
   argument = args.pt?.arguments?.[0],
@@ -306,6 +327,15 @@ export default {
     } else {
       thenArg = (await args.fn(args.pt.arguments[1])).builder;
       elseArg = (await args.fn(args.pt.arguments[2])).builder;
+    }
+
+    // Oracle: keep the THEN / ELSE result branches type-consistent so a CLOB
+    // branch (e.g. CONCAT) and a VARCHAR2 literal don't collide in the CASE.
+    if (args.knex.clientType() === 'oracledb') {
+      [thenArg, elseArg] = unifyOracleClobCaseBranches(args.knex, [
+        thenArg,
+        elseArg,
+      ]);
     }
 
     const queries: Knex.Raw[] = [];
