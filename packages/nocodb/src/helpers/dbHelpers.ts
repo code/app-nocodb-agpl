@@ -1109,7 +1109,8 @@ export function getArrayAggExpression(
   columnName: string,
   alias: string,
 ): Knex.Raw {
-  const client = knexConnection.client.config.client;
+  const client =
+    knexConnection.clientType?.() ?? knexConnection.client.config.client;
 
   // Note: columnName and alias are controlled by our code, so it's safe to use directly
   const exprMap: Record<string, string> = {

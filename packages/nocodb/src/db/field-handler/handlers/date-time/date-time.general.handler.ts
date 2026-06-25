@@ -326,7 +326,7 @@ export class DateTimeGeneralHandler extends GenericFieldHandler {
     // (ORA-01830 / ORA-01861), turning the read into a 400. Non-date entries
     // are left as-is so the clause still works for malformed input.
     if (filter.comparison_op === 'in') {
-      let inValue = filter.value;
+      let inValue: string | string[] = filter.value;
       if (typeof inValue === 'string') {
         inValue = inValue.split(',').map((raw) => {
           const trimmed = raw.trim();

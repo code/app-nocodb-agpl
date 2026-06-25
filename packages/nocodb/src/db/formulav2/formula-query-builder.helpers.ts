@@ -124,7 +124,7 @@ export const wrapFormulaWithMaxLength = ({
 // plain column identifier; a raw subquery is left as-is (aggregating over a
 // subquery is a separate, cross-dialect limitation that a cast can't fix).
 const mssqlNumericCn = (qb: any, cn: any) =>
-  typeof cn === 'string' && qb?.client?.config?.client === 'mssql'
+  typeof cn === 'string' && qb?.client?.driverName === 'mssql'
     ? qb.client.raw('CAST(?? AS FLOAT)', [cn])
     : cn;
 

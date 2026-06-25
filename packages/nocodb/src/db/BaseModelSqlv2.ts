@@ -8576,7 +8576,7 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
       );
     }
 
-    const client = this.dbDriver.client.config.client;
+    const client = this.dbDriver.clientType();
     if (!sql[client]) {
       NcError.get(this.context).notImplemented(
         'Recalculate order not implemented for this database',

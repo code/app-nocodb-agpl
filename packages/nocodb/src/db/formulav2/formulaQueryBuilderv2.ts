@@ -385,35 +385,16 @@ async function _formulaQueryBuilder(params: FormulaQueryBuilderBaseParams) {
         prevBinaryOp,
       });
     } else if (pt.type === 'Literal') {
-      // MSSQL workaround: inline string literals directly instead of going
-      // through knex bindings. knex-mssql's positional-to-named substitution
-      // does a naive `sql.replace(/\?/g, '@pN')` that DOES NOT track
-      // string-literal context — so a `?` inside a user's literal (e.g. a
-      // URL like `https://x.com/?q=1`) gets corrupted to `@p0`.
-      //
-      // Inlining with the standard `N'...'` SQL Server literal isn't enough:
-      // the formula composer (parsed-tree-builder) further runs
-      // `.replace(/\?/g, '\\?')` on the composed expression to escape any
-      // surviving `?` placeholders, but knex then strips that backslash and
-      // hands a plain `?` to the dialect adapter — which mangles it again.
-      //
-      // The robust workaround: emit ZERO `?` characters in the resulting
-      // SQL by splitting on `?` and re-composing the literal via
-      // `CHAR(63)` (T-SQL for `?`). Empty fragments and trailing `?`s are
-      // handled naturally by `CONCAT`.
+      // MSSQL: inline string literals as `N'...'` rather than binding `?`.
+      // Two reasons remain after centralising the `?` fix in knex-mssql:
+      //   1. Unicode — a bound string inlines as varchar via `.toQuery()`;
+      //      `N'...'` keeps it nvarchar.
+      //   2. The formula composer (parsed-tree-builder) escapes `?`→`\?` on
+      //      the composed SQL, which a bound `?` placeholder wouldn't survive.
+      // The old CHAR(63) `?`-splitting is gone: knex-mssql's positionBindings
+      // preserves a literal `?` inside the quotes
       if (knex.clientType() === 'mssql' && typeof pt.value === 'string') {
-        const escapeSingles = (s: string) => s.replace(/'/g, "''");
-        const v = pt.value;
-        if (v.includes('?')) {
-          const parts = v.split('?');
-          const sqlArgs: string[] = [];
-          for (let i = 0; i < parts.length; i++) {
-            if (i > 0) sqlArgs.push('CHAR(63)');
-            sqlArgs.push(`N'${escapeSingles(parts[i])}'`);
-          }
-          return { builder: knex.raw(`CONCAT(${sqlArgs.join(', ')})`) };
-        }
-        return { builder: knex.raw(`N'${escapeSingles(v)}'`) };
+        return { builder: knex.raw(`N'${pt.value.replace(/'/g, "''")}'`) };
       }
       if (knex.clientType() === 'mssql' && typeof pt.value === 'boolean') {
         return { builder: knex.raw(pt.value ? '1' : '0') };

@@ -45,7 +45,11 @@ export class DBQueryClient {
   }
 
   static fromKnex(knex: Knex, dbVersion?: string): DBQueryClientType {
-    const c: string = knex.client.config.client;
+    const cfgClient = knex.client?.config?.client as any;
+    const c: string =
+      typeof cfgClient === 'string'
+        ? cfgClient
+        : cfgClient?.prototype?.dialect || cfgClient?.prototype?.driverName;
     switch (c) {
       case 'pg':
         return DBQueryClient.get(ClientType.PG, dbVersion);
