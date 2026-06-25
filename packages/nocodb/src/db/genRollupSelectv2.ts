@@ -8,6 +8,7 @@ import {
   UITypes,
 } from 'nocodb-sdk';
 import { CircularRefContext } from 'nocodb-sdk';
+import type { ClientType } from 'nocodb-sdk';
 import type { IBaseModelSqlV2 } from './IBaseModelSqlV2';
 import type { Knex } from 'knex';
 import type {
@@ -25,6 +26,7 @@ import formulaQueryBuilderv2 from '~/db/formulav2/formulaQueryBuilderv2';
 import { extractLinkRelFiltersAndApply } from '~/db/conditionV2';
 import { getAliasedSoftDeleteFilter } from '~/helpers/dbHelpers';
 import { Profiler } from '~/helpers/profiler';
+import { DBQueryClient } from '~/dbQueryClient';
 
 export default async function genRollupSelectv2(param: {
   baseModelSqlv2: IBaseModelSqlV2;
@@ -99,6 +101,8 @@ export default async function genRollupSelectv2(param: {
   const parentModel = await parentCol?.getModel(parentContext);
   const refTableAlias =
     `__nc_rollup_` + Math.random().toString(36).substring(2, 8);
+
+  const dbQueryClient = DBQueryClient.get(knex.clientType() as ClientType);
   profiler.log('get base model');
 
   const parentBaseModel = await Model.getBaseModelSQL(parentContext, {
@@ -336,10 +340,11 @@ export default async function genRollupSelectv2(param: {
     case RelationTypes.HAS_MANY: {
       profiler.log('Relation: ' + relationColumnOption.type);
       const queryBuilder: any = knex(
-        knex.raw(`?? as ??`, [
+        dbQueryClient.tableAlias(
+          knex,
           childBaseModel.getTnPath(childModel),
           refTableAlias,
-        ]),
+        ),
       ).where(
         knex.ref(
           `${alias || parentBaseModel.getTnPath(parentModel.table_name)}.${
@@ -380,10 +385,11 @@ export default async function genRollupSelectv2(param: {
     case RelationTypes.ONE_TO_ONE: {
       profiler.log('Relation: ' + relationColumnOption.type);
       const qb = knex(
-        knex.raw(`?? as ??`, [
+        dbQueryClient.tableAlias(
+          knex,
           childBaseModel.getTnPath(childModel?.table_name),
           refTableAlias,
-        ]),
+        ),
       ).where(
         knex.ref(
           `${alias || parentBaseModel.getTnPath(parentModel.table_name)}.${
@@ -437,10 +443,11 @@ export default async function genRollupSelectv2(param: {
       }
 
       const qb = knex(
-        knex.raw(`?? as ??`, [
+        dbQueryClient.tableAlias(
+          knex,
           parentBaseModel.getTnPath(parentModel?.table_name),
           refTableAlias,
-        ]),
+        ),
       )
         .innerJoin(
           assocBaseModel.getTnPath(mmModel.table_name) as any,

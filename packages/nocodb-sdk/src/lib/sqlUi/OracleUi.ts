@@ -379,9 +379,13 @@ export class OracleUi implements SqlUi {
     const dt = (col.dt || col.dt_s)?.toLowerCase();
     switch (dt) {
       // NUMBER scale decides integer vs float: explicit scale 0 (NUMBER(p),
-      // INTEGER, identity columns) is integral; a fractional or unconstrained
-      // scale (bare NUMBER has data_scale = null) can hold fractions.
+      // INTEGER) is integral; a fractional or unconstrained scale (bare
+      // NUMBER has data_scale = null) can hold fractions. Identity columns
+      // are sequence-backed integers regardless of declared scale — a bare
+      // NUMBER identity has data_scale = null and would otherwise introspect
+      // as float (pg parity: serial/identity → integer).
       case 'number': {
+        if (col.ai) return 'integer';
         const scale = col.ns ?? col.dtxs;
         return scale !== null &&
           scale !== undefined &&
@@ -436,10 +440,58 @@ export class OracleUi implements SqlUi {
     return 'string';
   }
 
+  static getMetaAbstractType(col): any {
+    const dt = (col.dt || col.dt_s)?.toLowerCase();
+    switch (dt) {
+      case 'number':
+      case 'float':
+      case 'binary_float':
+      case 'binary_double':
+      case 'boolean':
+      case 'date':
+      case 'timestamp':
+      case 'timestamp with time zone':
+      case 'timestamp with local time zone':
+      case 'char':
+      case 'nchar':
+      case 'varchar2':
+      case 'nvarchar2':
+      case 'clob':
+      case 'nclob':
+      case 'long':
+      case 'json':
+        return this.getAbstractType(col);
+
+      // pg meta-sync parity: interval → 'string' → SingleLineText
+      case 'interval year to month':
+      case 'interval day to second':
+        return 'string';
+
+      // Binary and opaque Oracle-native types intentionally return no
+      // abstract type so abstractTypeToMetaUIType falls through to
+      // SpecificDBType. NB: unlike PgUi we can't return the raw dt here —
+      // Oracle's 'blob' would collide with the mapped 'blob' abstract type
+      // (mysql's blob → LongText behavior), and pg maps binary (bytea) to
+      // SpecificDBType, which is the reference.
+      case 'blob':
+      case 'long raw':
+      case 'bfile':
+      case 'raw':
+      case 'rowid':
+      case 'urowid':
+      case 'xmltype':
+      case 'vector':
+        return undefined;
+    }
+    // Unknown native types → SpecificDBType as well (pg parity: unlisted
+    // types return undefined from getMetaAbstractType).
+    return undefined;
+  }
+
   // Introspection UIType for meta-sync — distinct from getUIType
   // (column-creation default). See metaUiDataType.ts.
   static getMetaUIDataType(col): any {
-    return abstractTypeToMetaUIType(this.getAbstractType(col));
+    return abstractTypeToMetaUIType(this.getMetaAbstractType(col));
   }
 
   static getUIType(col): any {
@@ -883,9 +935,7 @@ export class OracleUi implements SqlUi {
   // text types fit inside Oracle's index-key limit (~6398 bytes on 8K
   // blocks with byte-length semantics), so they stay uniquely-indexable.
   static isUniqueSupportedField(uidt: UITypes): boolean {
-    return ![UITypes.LongText, UITypes.Attachment, UITypes.JSON].includes(
-      uidt,
-    );
+    return ![UITypes.LongText, UITypes.Attachment, UITypes.JSON].includes(uidt);
   }
   isUniqueSupportedField(uidt: UITypes): boolean {
     return OracleUi.isUniqueSupportedField(uidt);
@@ -898,7 +948,7 @@ export class OracleUi implements SqlUi {
   }
   adjustLengthAndScale(
     _newColumn: Partial<ColumnType>,
-    _oldColumn?: ColumnType,
+    _oldColumn?: ColumnType
   ) {}
   isParsedJsonReturnType(col: ColumnType): boolean {
     return ['json'].includes(col.dt?.toLowerCase());

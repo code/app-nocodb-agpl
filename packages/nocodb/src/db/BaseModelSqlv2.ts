@@ -6906,11 +6906,11 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
       // `trx.raw`, so we can skip the wrap entirely.
       return await trx.raw(query);
     } else if (this.isOracle) {
-      // The Oracle dialect is under active development — log every statement
-      // right before it executes so CI failures carry the offending SQL
-      // inline. knex's oracledb dialect returns SELECT rows as a plain array
-      // from `trx.raw`, so the `__nc_alias` wrap is unnecessary (and the
-      // bare-keyword alias it emits is invalid in Oracle anyway).
+      // knex's oracledb dialect returns SELECT rows as a plain array from
+      // `trx.raw`, so the `__nc_alias` wrap is unnecessary — and Oracle
+      // rejects it outright (ORA-00911: unquoted identifiers can't start
+      // with an underscore). The dialect is WIP — log every statement right
+      // before it executes so CI failures carry the offending SQL inline.
       console.log('[oracle][base-model]', query);
       return await trx.raw(query);
     } else if (SELECT_REGEX.test(query)) {

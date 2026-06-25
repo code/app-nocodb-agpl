@@ -6,6 +6,7 @@ import { PGDBQueryClient } from '~/dbQueryClient/pg';
 import { MySqlDBQueryClient } from '~/dbQueryClient/mysql';
 import { SqliteDBQueryClient } from '~/dbQueryClient/sqlite';
 import { MssqlDBQueryClient } from '~/dbQueryClient/mssql';
+import { OracleDBQueryClient } from '~/dbQueryClient/oracle';
 
 export class DBQueryClient {
   static get(
@@ -32,6 +33,10 @@ export class DBQueryClient {
         client = new MssqlDBQueryClient();
         break;
       }
+      case ClientType.ORACLE: {
+        client = new OracleDBQueryClient();
+        break;
+      }
     }
     if (client) {
       client.dbVersion = dbVersion;
@@ -51,6 +56,8 @@ export class DBQueryClient {
         return DBQueryClient.get(ClientType.SQLITE, dbVersion);
       case 'mssql':
         return DBQueryClient.get(ClientType.MSSQL, dbVersion);
+      case 'oracledb':
+        return DBQueryClient.get(ClientType.ORACLE, dbVersion);
       default:
         throw new Error(`DBQueryClient: unsupported knex client '${c}'`);
     }

@@ -65,6 +65,10 @@ export abstract class GenericDBQueryClient implements DBQueryClient {
     return param.knex.from(this.temporaryTableRaw(param));
   }
 
+  tableAlias(knex: XKnex, table: string | Knex.Raw, alias: string): Knex.Raw {
+    return knex.raw(`?? as ??`, [table, alias]);
+  }
+
   abstract concat(fields: string[]): string;
   abstract simpleCast(field: string, asType: string): string;
 

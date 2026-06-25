@@ -7,6 +7,7 @@ import {
   UITypes,
 } from 'nocodb-sdk';
 import type { Knex } from 'knex';
+import type { ClientType } from 'nocodb-sdk';
 import type { IBaseModelSqlV2 } from '~/db/IBaseModelSqlV2';
 import type { QueryWithCte } from '~/helpers/dbHelpers';
 import type { NcContext } from '~/interface/config';
@@ -26,6 +27,7 @@ import { NcError } from '~/helpers/catchError';
 import { getAliasedSoftDeleteFilter, getAs } from '~/helpers/dbHelpers';
 import { Model } from '~/models';
 import { getAliasGenerator } from '~/utils';
+import { DBQueryClient } from '~/dbQueryClient';
 
 const LOOKUP_VAL_SEPARATOR = '___';
 
@@ -76,6 +78,8 @@ export default async function generateLookupSelectQuery({
   isAggregation?: boolean;
 }): Promise<QueryWithCte> {
   const knex = baseModelSqlv2.dbDriver;
+
+  const dbQueryClient = DBQueryClient.get(knex.clientType() as ClientType);
 
   const context = baseModelSqlv2.context;
 
@@ -158,10 +162,11 @@ export default async function generateLookupSelectQuery({
         });
 
         selectQb = knex(
-          knex.raw(`?? as ??`, [
+          dbQueryClient.tableAlias(
+            knex,
             parentBaseModel.getTnPath(parentModel.table_name),
             alias,
-          ]),
+          ),
         ).where(
           `${alias}.${parentColumn.column_name}`,
           knex.raw(`??`, [
@@ -199,10 +204,11 @@ export default async function generateLookupSelectQuery({
         });
 
         selectQb = knex(
-          knex.raw(`?? as ??`, [
+          dbQueryClient.tableAlias(
+            knex,
             childBaseModel.getTnPath(childModel.table_name),
             alias,
-          ]),
+          ),
         ).where(
           `${alias}.${childColumn.column_name}`,
           knex.raw(`??`, [
@@ -243,10 +249,11 @@ export default async function generateLookupSelectQuery({
         });
 
         selectQb = knex(
-          knex.raw(`?? as ??`, [
+          dbQueryClient.tableAlias(
+            knex,
             parentBaseModel.getTnPath(parentModel.table_name),
             alias,
-          ]),
+          ),
         );
 
         const mmTableAlias = getAlias();
@@ -387,10 +394,11 @@ export default async function generateLookupSelectQuery({
           });
 
           selectQb.join(
-            knex.raw(`?? as ??`, [
+            dbQueryClient.tableAlias(
+              knex,
               parentBaseModel.getTnPath(parentModel.table_name),
               nestedAlias,
-            ]),
+            ),
             `${nestedAlias}.${parentColumn.column_name}`,
             `${prevAlias}.${childColumn.column_name}`,
           );
@@ -417,10 +425,11 @@ export default async function generateLookupSelectQuery({
           });
 
           selectQb.join(
-            knex.raw(`?? as ??`, [
+            dbQueryClient.tableAlias(
+              knex,
               childBaseModel.getTnPath(childModel.table_name),
               nestedAlias,
-            ]),
+            ),
             `${nestedAlias}.${childColumn.column_name}`,
             `${prevAlias}.${parentColumn.column_name}`,
           );
@@ -474,10 +483,11 @@ export default async function generateLookupSelectQuery({
               knex.ref(`${prevAlias}.${childColumn.column_name}`) as any,
             )
             .innerJoin(
-              knex.raw('?? as ??', [
+              dbQueryClient.tableAlias(
+                knex,
                 parentBaseModel.getTnPath(parentModel.table_name),
                 nestedAlias,
-              ]),
+              ),
               knex.ref(`${mmTableAlias}.${mmParentCol.column_name}`) as any,
               '=',
               knex.ref(`${nestedAlias}.${parentColumn.column_name}`) as any,
