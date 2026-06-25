@@ -127,6 +127,7 @@ export const aggregate =
 
       return await baseModel.execAndParse(qb, null, {
         first: true,
+        bulkAggregate: true,
         skipDateConversion: true,
         skipAttachmentConversion: true,
         skipUserConversion: true,

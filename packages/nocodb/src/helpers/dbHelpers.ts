@@ -951,23 +951,34 @@ function detectBoolDialect(knexOrModel: DialectAware): {
   const m = knexOrModel as Partial<{
     isMssql: boolean;
     isOracle: boolean;
-    dbDriver: { client: { config: { client?: unknown } } };
-    client: { config: { client?: unknown } };
+    dbDriver: { client?: any };
+    client: any;
   }>;
-  const rawClient =
-    m.client?.config?.client ?? m.dbDriver?.client?.config?.client;
+
+  if (typeof m.isMssql === 'boolean' || typeof m.isOracle === 'boolean') {
+    return { isMssql: !!m.isMssql, isOracle: !!m.isOracle };
+  }
+
+  // knex instance / QueryBuilder / transaction: resolve from the Client. A
+  // bare QueryBuilder's `client.config.client` doesn't always surface the
+  // dialect string, so fall back to the Client instance's own `driverName` /
+  // `dialect` (set on every knex Client, incl. the custom OracledbClient) —
+  // otherwise mssql/oracle silently get the JS boolean `true`/`false`, which
+  // they reject (`Invalid column name 'true'`).
+  const clientInstance = m.client ?? m.dbDriver?.client;
+  const rawClient = clientInstance?.config?.client;
   const clientProto = (
     rawClient as { prototype?: { dialect?: string; driverName?: string } }
   )?.prototype;
   const clientName =
-    typeof rawClient === 'string'
+    (typeof rawClient === 'string'
       ? rawClient
-      : clientProto?.dialect ?? clientProto?.driverName;
+      : clientProto?.dialect ?? clientProto?.driverName) ??
+    clientInstance?.driverName ??
+    clientInstance?.dialect;
   return {
-    isMssql:
-      typeof m.isMssql === 'boolean' ? m.isMssql : clientName === 'mssql',
-    isOracle:
-      typeof m.isOracle === 'boolean' ? m.isOracle : clientName === 'oracledb',
+    isMssql: clientName === 'mssql',
+    isOracle: clientName === 'oracledb',
   };
 }
 
