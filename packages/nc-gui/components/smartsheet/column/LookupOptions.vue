@@ -304,7 +304,7 @@ const handleScrollIntoView = () => {
         <template #tab>
           <div class="tab" data-testid="nc-lookup-tab-configuration">{{ $t('labels.configuration') }}</div>
         </template>
-        <div class="w-full flex flex-col gap-4 pt-1">
+        <div class="w-full flex flex-col gap-4 pt-3">
           <div class="w-full flex flex-row space-x-2">
             <a-form-item
               class="flex w-1/2 !max-w-[calc(50%_-_4px)]"
@@ -458,7 +458,7 @@ const handleScrollIntoView = () => {
         <template #tab>
           <div class="tab" data-testid="nc-lookup-tab-formatting">{{ $t('labels.formatting') }}</div>
         </template>
-        <div class="w-full flex flex-col gap-4 pt-1">
+        <div class="w-full flex flex-col gap-4 pt-3">
           <template v-if="isFormattable">
             <a-form-item class="!mb-0" :label="$t('general.format')">
               <NcSelect
@@ -512,7 +512,7 @@ const handleScrollIntoView = () => {
             />
           </template>
 
-          <div v-else class="text-nc-content-gray-subtle2 text-bodySm" data-testid="nc-lookup-not-formattable">
+          <div v-else class="text-nc-content-gray-subtle2 text-bodySm max-w-[440px]" data-testid="nc-lookup-not-formattable">
             {{ $t('msg.info.lookupResultTypeNotFormattable') }}
           </div>
         </div>
