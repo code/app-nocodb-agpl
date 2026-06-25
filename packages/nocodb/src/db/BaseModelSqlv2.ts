@@ -3019,6 +3019,22 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
       }
 
       let response;
+
+      // Oracle has no `DEFAULT VALUES` / column-less `VALUES (default)`: an empty
+      // insert object compiles to `insert into "t" () values (default)` and fails
+      // with ORA-00947. Pin the PK to DEFAULT so it becomes a valid
+      // `insert into "t" ("PK") values (DEFAULT)` — other columns take their own
+      // defaults; an identity/sequence-trigger PK is generated as usual.
+      if (
+        this.isOracle &&
+        insertObj &&
+        Object.keys(insertObj).length === 0 &&
+        this.model.primaryKey
+      ) {
+        insertObj[this.model.primaryKey.column_name] =
+          this.dbDriver.raw('DEFAULT');
+      }
+
       const query = this.dbDriver(this.tnPath).insert(insertObj);
 
       // pg + mssql both support inline RETURNING/OUTPUT — knex's mssql
