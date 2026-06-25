@@ -391,13 +391,18 @@ export class LinkPlaceholderService {
     // COALESCE so a single NULL doesn't contaminate the whole aggregate to
     // NULL (PG behaviour). mssql has no GROUP_CONCAT — STRING_AGG is the
     // T-SQL equivalent (SQL Server 2017+, separator as second arg, ignores
-    // pure NULL rows so the COALESCE keeps empty segments visible).
+    // pure NULL rows so the COALESCE keeps empty segments visible). Oracle has
+    // neither — LISTAGG(... WITHIN GROUP) is the equivalent; it skips NULLs
+    // (and Oracle stores '' AS NULL, so COALESCE would be a no-op) and the
+    // subquery already filters `pvExpr IS NOT NULL`, so no COALESCE is needed.
     const aggFn = baseModel.isPg
       ? `string_agg(COALESCE(${pvExpr}::text, ''), ', ')`
       : baseModel.isMySQL
       ? `GROUP_CONCAT(COALESCE(${pvExpr}, '') SEPARATOR ', ')`
       : baseModel.isMssql
       ? `STRING_AGG(COALESCE(${pvExpr}, ''), ', ')`
+      : baseModel.isOracle
+      ? `LISTAGG(TO_CHAR(${pvExpr}), ', ') WITHIN GROUP (ORDER BY NULL)`
       : `GROUP_CONCAT(COALESCE(${pvExpr}, ''), ', ')`;
 
     const isMMLike = isMMOrMMLike({ ...originalCol, colOptions: colOpt });
@@ -463,6 +468,23 @@ export class LinkPlaceholderService {
           null,
           { raw: true },
         );
+      } else if (baseModel.isOracle) {
+        // Oracle has no `UPDATE ... FROM`; MERGE is the join-update form. The
+        // source alias must start with a letter (a `_linked`-style underscore
+        // prefix is invalid unquoted — ORA-00911) and table aliases take no
+        // `AS` (ORA-03048). The subquery's `fk_val`/`dv` column aliases stay
+        // unquoted so they fold to the same case as the unquoted references.
+        await baseModel.execAndParse(
+          `MERGE INTO ${srcTn} USING (${subquery}) nc_ph_linked ON (${qCol(
+            srcTn,
+            childCol.column_name,
+          )} = nc_ph_linked.fk_val) WHEN MATCHED THEN UPDATE SET ${qCol(
+            srcTn,
+            phCn,
+          )} = nc_ph_linked.dv`,
+          null,
+          { raw: true },
+        );
       } else {
         await baseModel.execAndParse(
           `UPDATE ${srcTn} SET ${qi(
@@ -509,6 +531,20 @@ export class LinkPlaceholderService {
             srcTn,
             parentCol.column_name,
           )} = _linked.\`fk_val\` SET ${qCol(srcTn, phCn)} = _linked.\`dv\``,
+          null,
+          { raw: true },
+        );
+      } else if (baseModel.isOracle) {
+        // Oracle has no `UPDATE ... FROM` — see the MM branch above for why the
+        // source alias is `nc_ph_linked` and the table alias carries no `AS`.
+        await baseModel.execAndParse(
+          `MERGE INTO ${srcTn} USING (${subquery}) nc_ph_linked ON (${qCol(
+            srcTn,
+            parentCol.column_name,
+          )} = nc_ph_linked.fk_val) WHEN MATCHED THEN UPDATE SET ${qCol(
+            srcTn,
+            phCn,
+          )} = nc_ph_linked.dv`,
           null,
           { raw: true },
         );
@@ -570,11 +606,15 @@ export class LinkPlaceholderService {
           null,
           { raw: true },
         );
-      } else if (baseModel.isMssql) {
+      } else if (baseModel.isMssql || baseModel.isOracle) {
+        // Oracle uses the same correlated-subquery UPDATE as T-SQL, but rejects
+        // `AS` before a table alias (ORA-03048) — the relation alias is bare
+        // there. (The quoted `__nc_ph_rel` alias itself is valid in Oracle.)
+        const relFromAs = baseModel.isOracle ? '' : 'AS ';
         await baseModel.execAndParse(
           `UPDATE ${srcTn} SET ${qi(
             phCn,
-          )} = (SELECT ${pvExprAliased} FROM ${relTn} AS ${relAliasQ} WHERE ${relAliasQ}.${qi(
+          )} = (SELECT ${pvExprAliased} FROM ${relTn} ${relFromAs}${relAliasQ} WHERE ${relAliasQ}.${qi(
             parentCol.column_name,
           )} = ${qCol(srcTn, childCol.column_name)}) WHERE ${qCol(
             srcTn,
