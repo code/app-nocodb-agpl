@@ -6930,10 +6930,14 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
       // knex's oracledb dialect returns SELECT rows as a plain array from
       // `trx.raw`, so the `__nc_alias` wrap is unnecessary — and Oracle
       // rejects it outright (ORA-00911: unquoted identifiers can't start
-      // with an underscore). The dialect is WIP — log every statement right
-      // before it executes so CI failures carry the offending SQL inline.
-      console.log('[oracle][base-model]', query);
-      return await trx.raw(query);
+      // with an underscore). The dialect is WIP — on failure, log the
+      // offending statement so the error carries the SQL inline.
+      try {
+        return await trx.raw(query);
+      } catch (e) {
+        console.log('[oracle][base-model]', query);
+        throw e;
+      }
     } else if (SELECT_REGEX.test(query)) {
       return await trx.from(trx.raw(query).wrap('(', ') __nc_alias'));
     } else if (this.isMySQL && INSERT_REGEX.test(query)) {
