@@ -919,15 +919,57 @@ export function generateRecursiveCTE(_params: {
 }
 
 /**
- * Anything that lets us detect the underlying knex dialect: a Knex /
- * Knex.QueryBuilder / Knex.Raw exposes `.client.config.client`, while
- * `BaseModelSqlv2`-like objects expose `.isMssql` directly (and the
- * driver via `.dbDriver`).
+ * Anything these helpers can detect the underlying knex dialect from:
+ *   - a `BaseModelSqlv2` ({@link IBaseModelSqlV2}) — answers via `.isMssql` /
+ *     `.isOracle`, or its `.dbDriver`;
+ *   - a raw knex object — instance ({@link CustomKnex}), query builder, or
+ *     transaction — read via `.client.config.client`.
  */
 export type DialectAware =
-  | { isMssql: boolean }
-  | { dbDriver: { client: { config: { client?: unknown } } } }
-  | { client: { config: { client?: unknown } } };
+  | IBaseModelSqlV2
+  | CustomKnex
+  | Knex.QueryBuilder
+  | Knex.Transaction;
+
+/**
+ * Detect whether a {@link DialectAware} resolves to mssql / oracle.
+ *
+ * `BaseModelSqlv2`-like objects answer directly via `.isMssql` / `.isOracle`.
+ * For a raw Knex / QueryBuilder we read `config.client` — but that is NOT
+ * always the dialect string: `CustomKnex` swaps it for a custom Client
+ * *class* (MssqlClient / OracledbClient / …) before `knex()` is called, and
+ * those classes pin `prototype.dialect`/`prototype.driverName` back to the
+ * dialect name. Mirror `clientType()`'s resolution (CustomKnex.ts) so
+ * detection survives the swap regardless of whether a model or a knex is
+ * passed — otherwise these helpers silently fall back to the PG/MySQL branch
+ * and emit `… = true` (→ "Invalid column name 'true'") on mssql/oracle.
+ */
+function detectBoolDialect(knexOrModel: DialectAware): {
+  isMssql: boolean;
+  isOracle: boolean;
+} {
+  const m = knexOrModel as Partial<{
+    isMssql: boolean;
+    isOracle: boolean;
+    dbDriver: { client: { config: { client?: unknown } } };
+    client: { config: { client?: unknown } };
+  }>;
+  const rawClient =
+    m.client?.config?.client ?? m.dbDriver?.client?.config?.client;
+  const clientProto = (
+    rawClient as { prototype?: { dialect?: string; driverName?: string } }
+  )?.prototype;
+  const clientName =
+    typeof rawClient === 'string'
+      ? rawClient
+      : clientProto?.dialect ?? clientProto?.driverName;
+  return {
+    isMssql:
+      typeof m.isMssql === 'boolean' ? m.isMssql : clientName === 'mssql',
+    isOracle:
+      typeof m.isOracle === 'boolean' ? m.isOracle : clientName === 'oracledb',
+  };
+}
 
 /**
  * Returns the dialect-correct value for a `bit`/`boolean` column
@@ -950,18 +992,7 @@ export function deletedColValue(
   knexOrModel: DialectAware,
   isDeleted: boolean,
 ): boolean | number {
-  const m = knexOrModel as Partial<{
-    isMssql: boolean;
-    isOracle: boolean;
-    dbDriver: { client: { config: { client?: unknown } } };
-    client: { config: { client?: unknown } };
-  }>;
-  const clientName =
-    m.client?.config?.client ?? m.dbDriver?.client?.config?.client;
-  const isMssql =
-    typeof m.isMssql === 'boolean' ? m.isMssql : clientName === 'mssql';
-  const isOracle =
-    typeof m.isOracle === 'boolean' ? m.isOracle : clientName === 'oracledb';
+  const { isMssql, isOracle } = detectBoolDialect(knexOrModel);
   return isMssql || isOracle ? (isDeleted ? 1 : 0) : isDeleted;
 }
 
@@ -985,18 +1016,7 @@ export function boolSqlLiteral(
   knexOrModel: DialectAware,
   value: boolean,
 ): string {
-  const m = knexOrModel as Partial<{
-    isMssql: boolean;
-    isOracle: boolean;
-    dbDriver: { client: { config: { client?: unknown } } };
-    client: { config: { client?: unknown } };
-  }>;
-  const clientName =
-    m.client?.config?.client ?? m.dbDriver?.client?.config?.client;
-  const isMssql =
-    typeof m.isMssql === 'boolean' ? m.isMssql : clientName === 'mssql';
-  const isOracle =
-    typeof m.isOracle === 'boolean' ? m.isOracle : clientName === 'oracledb';
+  const { isMssql, isOracle } = detectBoolDialect(knexOrModel);
   if (isMssql || isOracle) return value ? '1' : '0';
   return value ? 'true' : 'false';
 }
