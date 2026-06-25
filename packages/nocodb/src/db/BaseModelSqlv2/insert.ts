@@ -70,6 +70,21 @@ export const baseModelInsert = (baseModel: IBaseModelSqlV2) => {
       let response;
       // const driver = trx ? trx : baseModel.dbDriver;
 
+      // Oracle has no `DEFAULT VALUES` / column-less `VALUES (default)`: an empty
+      // insert object compiles to `insert into "t" () values (default)` and fails
+      // with ORA-00947 (not enough values). Pin the PK to DEFAULT so it becomes a
+      // valid `insert into "t" ("PK") values (DEFAULT)` — other columns take their
+      // own defaults, and an identity/sequence-trigger PK is generated as usual.
+      if (
+        baseModel.isOracle &&
+        insertObj &&
+        Object.keys(insertObj).length === 0 &&
+        baseModel.model.primaryKey
+      ) {
+        insertObj[baseModel.model.primaryKey.column_name] =
+          baseModel.dbDriver.raw('DEFAULT');
+      }
+
       const query = baseModel.dbDriver(baseModel.tnPath).insert(insertObj);
       // pg + mssql both support inline RETURNING/OUTPUT. knex's mssql
       // dialect translates `.returning('col as alias')` to
