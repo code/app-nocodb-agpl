@@ -157,22 +157,25 @@ CREATE SEQUENCE address_sequence;
 /
 
 CREATE OR REPLACE TRIGGER address_before_trigger
-BEFORE INSERT ON address FOR EACH ROW 
+BEFORE INSERT ON address FOR EACH ROW
 BEGIN
   IF (:NEW.address_id IS NULL) THEN
-    SELECT address_sequence.nextval INTO :NEW.address_id 
+    SELECT address_sequence.nextval INTO :NEW.address_id
     FROM DUAL;
   END IF;
- :NEW.last_update:=current_date;
+  -- Only default last_update when the row doesn't already carry one. The
+  -- fixture seeds canonical values (e.g. 2006-02-15); overwriting them with
+  -- current_date breaks date-sensitive tests (viewGridShare CSV compare).
+  IF :NEW.last_update IS NULL THEN
+    :NEW.last_update:=current_date;
+  END IF;
 END;
 /
 
-CREATE OR REPLACE TRIGGER address_before_update
-BEFORE UPDATE ON address FOR EACH ROW 
-BEGIN
-  :NEW.last_update:=current_date;
-END;
-/
+-- No BEFORE UPDATE last_update trigger: NocoDB backfills system columns
+-- (nc_order, etc.) via a bulk UPDATE during base setup, which would otherwise
+-- fire the trigger and reset every seeded last_update to current_date. The
+-- sakila fixture is static reference data, so auto-touch on update is unwanted.
 
 --
 -- Table structure for table language
