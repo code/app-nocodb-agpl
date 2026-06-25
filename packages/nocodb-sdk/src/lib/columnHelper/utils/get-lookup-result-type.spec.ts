@@ -33,8 +33,20 @@ describe('getUITypesForLookupResultType', () => {
     expect(getUITypesForLookupResultType(UITypes.Duration)).toEqual([]);
   });
 
-  it('offers date formats for date result types', () => {
-    for (const t of [UITypes.Date, UITypes.DateTime, UITypes.Time]) {
+  it('offers only Date for a Date source (no time to format)', () => {
+    expect(getUITypesForLookupResultType(UITypes.Date)).toEqual([UITypes.Date]);
+  });
+
+  it('offers only Time for a Time source (no date to format)', () => {
+    expect(getUITypesForLookupResultType(UITypes.Time)).toEqual([UITypes.Time]);
+  });
+
+  it('offers all date formats for DateTime / Created / LastModified (carry both)', () => {
+    for (const t of [
+      UITypes.DateTime,
+      UITypes.CreatedTime,
+      UITypes.LastModifiedTime,
+    ]) {
       expect(getUITypesForLookupResultType(t)).toEqual([
         UITypes.Date,
         UITypes.DateTime,

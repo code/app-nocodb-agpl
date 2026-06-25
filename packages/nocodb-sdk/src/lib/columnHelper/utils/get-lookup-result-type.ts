@@ -19,29 +19,39 @@ const lookupNumberResultTypes = new Set<UITypes>([
   UITypes.Year,
 ]);
 
-const lookupDateResultTypes = new Set<UITypes>([
-  UITypes.Date,
-  UITypes.DateTime,
-  UITypes.Time,
-  UITypes.CreatedTime,
-  UITypes.LastModifiedTime,
-]);
-
 /**
  * Display-type options offered on the Lookup "Formatting" tab for a given resolved
  * result type. Mirrors Airtable: only number and date result types are formattable.
+ *
+ * Date-category options are restricted to what the source value can actually
+ * satisfy — cross-converting between date and time is meaningless and renders
+ * broken output:
+ *   - a Date has no time   -> formatting as DateTime/Time yields 00:00
+ *   - a Time has no date   -> formatting as Date/DateTime yields today/blank
+ * So a Date offers only Date, a Time offers only Time, and only a DateTime (and the
+ * read-only Created/LastModified time, which carry both) offer all three.
  */
 export function getUITypesForLookupResultType(
   resultType: UITypes | null | undefined
 ): UITypes[] {
   if (!resultType) return [];
+
   if (lookupNumberResultTypes.has(resultType)) {
     return [UITypes.Decimal, UITypes.Currency, UITypes.Percent];
   }
-  if (lookupDateResultTypes.has(resultType)) {
-    return [UITypes.Date, UITypes.DateTime, UITypes.Time];
+
+  switch (resultType) {
+    case UITypes.Date:
+      return [UITypes.Date];
+    case UITypes.Time:
+      return [UITypes.Time];
+    case UITypes.DateTime:
+    case UITypes.CreatedTime:
+    case UITypes.LastModifiedTime:
+      return [UITypes.Date, UITypes.DateTime, UITypes.Time];
+    default:
+      return [];
   }
-  return [];
 }
 
 function formulaDataTypeToUIType(

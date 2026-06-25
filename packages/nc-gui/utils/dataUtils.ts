@@ -674,11 +674,15 @@ export const parsePlainCellValue = (
   if (isYear(col, abstractType)) {
     return getYearValue(value)
   }
-  if (isDateTime(col, abstractType)) {
-    return getDateTimeValue(value, params)
-  }
+  // Check Time before DateTime: a lookup formatting override builds an effective
+  // column with uidt=Time but inherits the source's `datetime` abstract type, so
+  // isDateTime (which matches on abstractType) would otherwise win and render the
+  // full datetime instead of just the time. uidt is authoritative here.
   if (isTime(col, abstractType)) {
     return getTimeValue(value, col)
+  }
+  if (isDateTime(col, abstractType)) {
+    return getDateTimeValue(value, params)
   }
   if (isDuration(col)) {
     return getDurationValue(value, col)
