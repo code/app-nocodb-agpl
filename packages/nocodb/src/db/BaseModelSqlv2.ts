@@ -2839,6 +2839,7 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
       isPg: this.isPg,
       isMySQL: this.isMySQL,
       isMssql: this.isMssql,
+      isOracle: this.isOracle,
       // isSnowflake: this.isSnowflake,
     };
   }
@@ -2865,6 +2866,10 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
 
   get isMssql() {
     return this.clientType === 'mssql';
+  }
+
+  get isOracle() {
+    return this.clientType === 'oracledb';
   }
 
   get clientType() {
@@ -6899,6 +6904,14 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
       // and common table expressions, unless TOP, OFFSET or FOR XML is
       // also specified"). Tedious returns the row array directly from
       // `trx.raw`, so we can skip the wrap entirely.
+      return await trx.raw(query);
+    } else if (this.isOracle) {
+      // The Oracle dialect is under active development — log every statement
+      // right before it executes so CI failures carry the offending SQL
+      // inline. knex's oracledb dialect returns SELECT rows as a plain array
+      // from `trx.raw`, so the `__nc_alias` wrap is unnecessary (and the
+      // bare-keyword alias it emits is invalid in Oracle anyway).
+      console.log('[oracle][base-model]', query);
       return await trx.raw(query);
     } else if (SELECT_REGEX.test(query)) {
       return await trx.from(trx.raw(query).wrap('(', ') __nc_alias'));
