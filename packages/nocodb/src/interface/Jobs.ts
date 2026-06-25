@@ -414,6 +414,8 @@ export interface ChatApprovalJobData extends JobData {
   sessionId: string;
   messageId: string;
   decisions: Record<string, 'approved' | 'denied'>;
+  /** User's current UI navigation context (active table/view/dashboard/document). */
+  uiContext?: ChatUIContext;
 }
 
 export interface MailDispatchJobData extends JobData {
