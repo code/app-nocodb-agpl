@@ -2981,24 +2981,17 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
 
       // Oracle pins a session NLS datetime format with no offset token, so a
       // raw `…+00:00` value (carried by V1/V2 payloads) raises ORA-01830 on
-      // insert. bulkInsert strips the offset inline, but this path relies on
-      // prepareNocoData, which skips DateTime/Time offset normalization for
-      // inserts — so do it here, mirroring bulkInsert. Time is DATE-backed on
-      // Oracle (no TIME type) and must carry a full datetime, not a bare
-      // `HH:mm:ss`. pg/mysql/sqlite tolerate the offset, so gate to Oracle.
+      // insert. prepareNocoData (called above) skips DateTime offset
+      // normalization for inserts, so do DateTime here — mirroring
+      // handleValidateBulkInsert. Time is offset-stripped via the field
+      // handler's parseUserInput inside prepareNocoData (Oracle + mssql, all
+      // insert/update paths), so it needs no inline handling here.
       if (this.isOracle && this.context.api_version !== NcApiVersion.V3) {
         for (const col of columns) {
           const v = insertObj[col.column_name];
           if (v === null || v === undefined) continue;
           if (col.uidt === UITypes.DateTime && dayjs(v).isValid()) {
             insertObj[col.column_name] = this.formatDate(v, col);
-          } else if (col.uidt === UITypes.Time) {
-            let t = dayjs(v);
-            if (!t.isValid()) t = dayjs(v, 'HH:mm:ss');
-            if (!t.isValid()) t = dayjs(`1999-01-01 ${v}`);
-            if (t.isValid()) {
-              insertObj[col.column_name] = t.format('YYYY-MM-DD HH:mm:ss');
-            }
           }
         }
       }
@@ -8780,7 +8773,13 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
             UITypes.JSON,
             UITypes.Currency,
             UITypes.Checkbox,
-          ].includes(column.uidt as UITypes))
+          ].includes(column.uidt as UITypes) ||
+          // Oracle/mssql pin a session time format that rejects the `+00:00`
+          // offset carried by raw V1/V2 Time payloads (ORA-01830 / mssql
+          // convert error). Unlike DateTime (normalized via formatDate above),
+          // Time has no offset-stripping on this update path — route it through
+          // parseUserInput so the dialect's getTimeFormat() drops the offset.
+          ((this.isOracle || this.isMssql) && column.uidt === UITypes.Time))
       ) {
         data[column.column_name] = (
           await FieldHandler.fromBaseModel(this).parseUserInput({
