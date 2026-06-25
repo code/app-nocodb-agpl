@@ -40,6 +40,7 @@ export interface ChatSessionMetaType {
     completed: string[];
     remaining: string[];
   }>;
+  sandboxId?: string;
 }
 
 export interface ChatSessionType {
@@ -115,6 +116,7 @@ export interface ChatMessageType {
   content?: string | null;
   parts?: ChatContentBlock[];
   files?: ChatAttachmentType[];
+  created_files?: ChatAttachmentType[];
   model?: string;
   input_tokens?: number;
   output_tokens?: number;
