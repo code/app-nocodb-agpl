@@ -19,7 +19,6 @@ describe('getUITypesForLookupResultType', () => {
       UITypes.Decimal,
       UITypes.Currency,
       UITypes.Percent,
-      UITypes.Duration,
       UITypes.Rating,
     ]) {
       expect(getUITypesForLookupResultType(t)).toEqual([
@@ -28,6 +27,10 @@ describe('getUITypesForLookupResultType', () => {
         UITypes.Percent,
       ]);
     }
+  });
+
+  it('does not offer formatting for Duration (stored as seconds/ms but shown as hh:mm:ss, so reformatting would misrepresent the value)', () => {
+    expect(getUITypesForLookupResultType(UITypes.Duration)).toEqual([]);
   });
 
   it('offers date formats for date result types', () => {

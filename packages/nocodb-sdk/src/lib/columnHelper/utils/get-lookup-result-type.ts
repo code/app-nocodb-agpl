@@ -4,12 +4,16 @@ import { FormulaDataTypes } from '~/lib/formula/enums';
 import { parseProp } from '~/lib/helperFunctions';
 import { resolveLookupLeafColumn } from './get-lookup-column-type';
 
+// Number result types whose stored value IS the number shown — reformatting them as
+// Decimal/Currency/Percent only changes presentation, never the meaning.
+// Duration is intentionally excluded: it is stored as seconds/ms but displayed as
+// hh:mm:ss, so reformatting the raw stored value (e.g. 7200) as Currency/Decimal would
+// misrepresent it ($7,200.00 instead of 2:00:00). Duration lookups keep their native format.
 const lookupNumberResultTypes = new Set<UITypes>([
   UITypes.Number,
   UITypes.Decimal,
   UITypes.Currency,
   UITypes.Percent,
-  UITypes.Duration,
   UITypes.Rating,
   UITypes.AutoNumber,
   UITypes.Year,
