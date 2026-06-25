@@ -74,19 +74,14 @@ export const baseModelInsert = (baseModel: IBaseModelSqlV2) => {
       // Without this, mssql falls into the generic else-branch (shaped
       // for mysql's `insertId`) and `extractCompositePK` returns '' →
       // ERR_INVALID_PK_VALUE.
-      if (
-        (baseModel.isPg || baseModel.isMssql || baseModel.isOracle) &&
-        baseModel.model.primaryKey
-      ) {
-        if (baseModel.isOracle) {
-          // Oracle's RETURNING…INTO rejects column aliases (ORA-00925) —
-          // return the bare column and remap to the col-id key below.
-          query.returning(baseModel.model.primaryKey.column_name);
-        } else {
-          query.returning(
-            `${baseModel.model.primaryKey.column_name} as ${baseModel.model.primaryKey.id}`,
-          );
-        }
+      // NOT oracle: its RETURNING…INTO clause needs driver out-binds, which
+      // the stringified execAndParse pipeline can't carry — `toQuery()`
+      // serializes the out-bind as a literal and execution fails with
+      // NJS-098. Oracle takes the MAX() fallback below instead.
+      if ((baseModel.isPg || baseModel.isMssql) && baseModel.model.primaryKey) {
+        query.returning(
+          `${baseModel.model.primaryKey.column_name} as ${baseModel.model.primaryKey.id}`,
+        );
 
         if (baseModel.isMssql) {
           // MSSQL: AI columns are stripped above (line ~33), so
@@ -115,13 +110,6 @@ export const baseModelInsert = (baseModel: IBaseModelSqlV2) => {
           }
         } else {
           response = await baseModel.execAndParse(query, null, { raw: true });
-        }
-
-        if (baseModel.isOracle && Array.isArray(response)) {
-          response = response.map((r) => ({
-            [baseModel.model.primaryKey.id]:
-              r[baseModel.model.primaryKey.column_name],
-          }));
         }
       }
 
@@ -174,7 +162,11 @@ export const baseModelInsert = (baseModel: IBaseModelSqlV2) => {
                 { raw: true, first: true },
               )
             )?.__nc_ai_id;
-          } else if (baseModel.isSnowflake || baseModel.isDatabricks) {
+          } else if (
+            baseModel.isSnowflake ||
+            baseModel.isDatabricks ||
+            baseModel.isOracle
+          ) {
             id = (
               await baseModel.execAndParse(
                 baseModel.dbDriver(baseModel.tnPath).max(ai.column_name, {

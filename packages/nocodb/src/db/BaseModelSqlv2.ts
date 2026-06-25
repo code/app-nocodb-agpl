@@ -33,6 +33,7 @@ import {
   LongTextAiMetaProp,
   NcApiVersion,
   NcErrorType,
+  ncIsBoolean,
   ncIsNull,
   ncIsNullOrUndefined,
   ncIsObject,
@@ -3076,7 +3077,7 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
                 },
               )
             )?.__nc_ai_id;
-          } else if (this.isSnowflake || this.isDatabricks) {
+          } else if (this.isSnowflake || this.isDatabricks || this.isOracle) {
             rowId = (
               await this.execAndParse(
                 this.dbDriver(this.tnPath).max(ai.column_name, {
@@ -3711,6 +3712,22 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
                 responses.push(...rows);
               }
             }
+          } else if (
+            !raw &&
+            this.isOracle &&
+            toInsert.length &&
+            this.model.primaryKeys?.length
+          ) {
+            const pkCols = this.model.primaryKeys;
+            const rows = await trx
+              .batchInsert(this.tnPath, toInsert, chunkSize)
+              .returning(pkCols.map((c) => c.column_name));
+            responses = ((rows ?? []) as any[]).map((r) =>
+              pkCols.reduce((acc, c) => {
+                acc[c.title] = r[c.column_name];
+                return acc;
+              }, {}),
+            );
           } else {
             responses =
               !raw && this.isPg
@@ -6720,9 +6737,11 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
                 query.where(column.column_name, r);
               }
 
-              return this.isSqlite ? this.dbDriver.select().from(query) : query;
+              return this.isSqlite || this.isOracle
+                ? this.dbDriver.select().from(query)
+                : query;
             }),
-            !this.isSqlite,
+            !(this.isSqlite || this.isOracle),
           )
           .as('__nc_grouped_list'),
       );
@@ -8517,6 +8536,13 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
         )}, ROW_NUMBER() OVER (ORDER BY ?? ASC) rn FROM ??) s ON ${this.model.primaryKeys
         .map((_pk) => `t.?? = s.??`)
         .join(' AND ')}`,
+      oracledb: `MERGE INTO ?? t USING (SELECT ${this.model.primaryKeys
+        .map((_pk) => `??`)
+        .join(
+          ', ',
+        )}, ROW_NUMBER() OVER (ORDER BY ?? ASC) rn FROM ??) s ON (${this.model.primaryKeys
+        .map((_pk) => `t.?? = s.??`)
+        .join(' AND ')}) WHEN MATCHED THEN UPDATE SET t.?? = s.rn`,
     };
 
     const orderColumn = this.model.columns.find((c) => isOrderCol(c));
@@ -8551,6 +8577,14 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
         this.tnPath,
         orderColumn.column_name,
         ...primaryKeys.flatMap((pk) => [pk, this.tnPath, pk]), // Flatten pk array for binding
+      ],
+      oracledb: [
+        this.tnPath, // MERGE INTO ?? t
+        ...primaryKeys, // SELECT (?? per pk)
+        orderColumn.column_name, // ORDER BY ?? (inside USING subquery)
+        this.tnPath, // FROM ?? (inside USING subquery)
+        ...primaryKeys.flatMap((pk) => [pk, pk]), // ON (t.?? = s.??) per pk
+        orderColumn.column_name, // SET t.?? = s.rn
       ],
       mssql: [
         orderColumn.column_name, // SET ??

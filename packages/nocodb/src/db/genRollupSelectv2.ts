@@ -302,11 +302,22 @@ export default async function genRollupSelectv2(param: {
         columnOptions.rollup_function,
       )
     ) {
-      qb.select(
-        knex.raw(`COALESCE((??), 0)`, [
-          knex[columnOptions.rollup_function as string]?.(selectColumnName),
-        ]),
-      );
+      if (baseModelSqlv2.isOracle) {
+        const fn = columnOptions.rollup_function as string;
+        const distinct = ['sumDistinct', 'avgDistinct'].includes(fn);
+        const baseFn = fn.replace('Distinct', '');
+        qb.select(
+          knex.raw(`COALESCE(${baseFn}(${distinct ? 'distinct ' : ''}??), 0)`, [
+            selectColumnName,
+          ]),
+        );
+      } else {
+        qb.select(
+          knex.raw(`COALESCE((??), 0)`, [
+            knex[columnOptions.rollup_function as string]?.(selectColumnName),
+          ]),
+        );
+      }
     } else {
       qb[columnOptions.rollup_function as string]?.(selectColumnName);
     }

@@ -183,14 +183,20 @@ export const selectObject = (baseModel: IBaseModelSqlV2, logger: Logger) => {
               // +00:00 like the pg/mysql shapes. TZ-aware variants
               // (TIMESTAMP WITH [LOCAL] TIME ZONE) are normalized to UTC
               // first.
+              //
+              // The +00:00 suffix is embedded in the TO_CHAR format as a
+              // quoted literal — appending it with `||` would turn NULL
+              // cells into the literal string '+00:00' (Oracle `||` treats
+              // NULL as '' instead of propagating it the way CONCAT /
+              // pg / mssql shapes do).
               const isTzAware = (column.dt ?? '')
                 .toUpperCase()
                 .includes('TIME ZONE');
               res[sanitize(getAs(column) || columnName)] =
                 baseModel.dbDriver.raw(
                   isTzAware
-                    ? `TO_CHAR(?? AT TIME ZONE '+00:00', 'YYYY-MM-DD HH24:MI:SS') || '+00:00'`
-                    : `TO_CHAR(??, 'YYYY-MM-DD HH24:MI:SS') || '+00:00'`,
+                    ? `TO_CHAR(?? AT TIME ZONE '+00:00', 'YYYY-MM-DD HH24:MI:SS"+00:00"')`
+                    : `TO_CHAR(??, 'YYYY-MM-DD HH24:MI:SS"+00:00"')`,
                   [`${sanitize(alias || baseModel.tnPath)}.${columnName}`],
                 );
               break;
@@ -761,6 +767,28 @@ export const selectObject = (baseModel: IBaseModelSqlV2, logger: Logger) => {
             if (oracleDt === 'RAW') {
               res[sanitize(getAs(column) || column.column_name)] =
                 baseModel.dbDriver.raw(`RAWTOHEX(??.??)`, [
+                  tnPart,
+                  column.column_name,
+                ]);
+              break;
+            }
+            // BLOB / NCLOB aren't in `fetchAsString` (knex's oracledb
+            // dialect only allows clob there), so node-oracledb returns
+            // them as Lob stream objects that break JSON serialization.
+            // Emit a bounded, display-oriented snippet instead: hex for
+            // BLOB (mssql binary parity), text for NCLOB. (LONG RAW can't
+            // be passed to SQL functions — left as-is.)
+            if (oracleDt === 'BLOB') {
+              res[sanitize(getAs(column) || column.column_name)] =
+                baseModel.dbDriver.raw(
+                  `RAWTOHEX(DBMS_LOB.SUBSTR(??.??, 2000, 1))`,
+                  [tnPart, column.column_name],
+                );
+              break;
+            }
+            if (oracleDt === 'NCLOB') {
+              res[sanitize(getAs(column) || column.column_name)] =
+                baseModel.dbDriver.raw(`DBMS_LOB.SUBSTR(??.??, 2000, 1)`, [
                   tnPart,
                   column.column_name,
                 ]);

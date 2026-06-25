@@ -611,6 +611,16 @@ knex.QueryBuilder.extend('concat', function (cn: any) {
         ]),
       );
       break;
+    case 'oracledb':
+      // LISTAGG requires a WITHIN GROUP clause; ORDER BY NULL keeps the
+      // subquery's input order. TO_CHAR so non-text lookup values aggregate.
+      this.select(
+        this.client.raw(
+          `LISTAGG(TO_CHAR(??), ',') WITHIN GROUP (ORDER BY NULL)`,
+          [cn],
+        ),
+      );
+      break;
   }
   return this;
 });

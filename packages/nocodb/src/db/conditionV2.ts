@@ -72,6 +72,10 @@ function formulaToTextCast(knex: any, expr: any) {
     // documented replacement.
     return knex.raw('CAST((?) AS NVARCHAR(MAX))', [expr]);
   }
+  if (client === 'oracledb') {
+    // Oracle has no TEXT type (ORA-00902).
+    return knex.raw('CAST((?) AS VARCHAR2(4000))', [expr]);
+  }
   return knex.raw('CAST((?) AS TEXT)', [expr]);
 }
 
@@ -661,11 +665,17 @@ const parseConditionV2 = async (
               // FieldHandler — only Formula-with-CWC and string-like
               // columns (SingleLineText, LongText, Email, PhoneNumber,
               // URL, Colour) reach here.
+              // Oracle stores '' as NULL, so the IS [NOT] NULL check alone is
+              // complete there — the empty-string arm is never true for
+              // `blank`, evaluates UNKNOWN for `notblank` (`NOT (x = NULL)`)
+              // which would filter out every row, and throws ORA-00932 on
+              // CLOB (LongText) columns.
               if (column.uidt === UITypes.Formula) {
                 qb = qb.whereNull(customWhereClause || field);
                 if (
                   (column?.colOptions as any).parsed_tree?.dataType ===
-                  FormulaDataTypes.STRING
+                    FormulaDataTypes.STRING &&
+                  knex.clientType() !== 'oracledb'
                 ) {
                   // The formula's compiled SQL may return non-text types — e.g.
                   // JSON_EXTRACT yields jsonb on PG and JSON on MySQL. A direct
@@ -687,7 +697,8 @@ const parseConditionV2 = async (
                     UITypes.LastModifiedTime,
                     UITypes.DateTime,
                     UITypes.Time,
-                  ].includes(column.uidt)
+                  ].includes(column.uidt) &&
+                  knex.clientType() !== 'oracledb'
                 ) {
                   qb = qb.orWhere(field, '');
                 }
@@ -695,11 +706,13 @@ const parseConditionV2 = async (
               break;
             case 'notblank':
               // Attachment / JSON / Date-family route to FieldHandler.
+              // Oracle: see the `blank` note — IS NOT NULL alone is complete.
               if (column.uidt === UITypes.Formula) {
                 qb = qb.whereNotNull(customWhereClause || field);
                 if (
                   (column?.colOptions as any).parsed_tree?.dataType ===
-                  FormulaDataTypes.STRING
+                    FormulaDataTypes.STRING &&
+                  knex.clientType() !== 'oracledb'
                 ) {
                   // See `blank` branch above for the rationale.
                   qb = qb.whereNot(
@@ -717,7 +730,8 @@ const parseConditionV2 = async (
                     UITypes.CreatedTime,
                     UITypes.LastModifiedTime,
                     UITypes.Time,
-                  ].includes(column.uidt)
+                  ].includes(column.uidt) &&
+                  knex.clientType() !== 'oracledb'
                 ) {
                   qb = qb.whereNot(field, '');
                 }
