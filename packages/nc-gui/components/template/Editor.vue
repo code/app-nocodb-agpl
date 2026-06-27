@@ -322,28 +322,34 @@ const isValid = ref(!importDataOnly)
 
 const importError = ref('')
 
-// The per-sheet "include in import" checkbox only applies when creating new
-// tables from a multi-sheet file (Excel). It's irrelevant for "import into an
-// existing table" and for single-sheet sources (CSV / JSON / one-sheet Excel).
-const showSheetSelection = computed(() => !importDataOnly && data.tables.length > 1)
+// The per-sheet "include in import" checkbox applies to any multi-sheet import —
+// creating new tables or uploading into existing ones. Single-sheet sources
+// (CSV / JSON / one-sheet Excel) never show it.
+const showSheetSelection = computed(() => data.tables.length > 1)
 
-// Import is allowed only when at least one sheet is included AND every included
-// sheet keeps a selected field. Drives the Import button so excluding every
-// sheet (or leaving an included sheet empty) can't queue an invalid import.
+// A sheet the user excluded (per-sheet checkbox off) isn't imported.
+const isSheetExcluded = (tableName?: string) => data.tables.find((t) => t.table_name === tableName)?.selected === false
+
+// Import is allowed only when at least one sheet is included. For new-table
+// imports every included sheet must also keep a selected field; for upload-into-
+// existing the mapping validity is handled separately (isValid).
 const canImport = computed(() => {
-  if (importDataOnly) return true
   const includedTables = data.tables.filter((t) => t.selected !== false)
-  return includedTables.length > 0 && includedTables.every((t) => (t.columns as any[])?.some((c) => c.selected) ?? false)
+  if (!includedTables.length) return false
+  if (importDataOnly) return true
+  return includedTables.every((t) => (t.columns as any[])?.some((c) => c.selected) ?? false)
 })
 
 const formRef = ref()
 
 watch(
-  [() => srcDestMapping.value],
+  [() => srcDestMapping.value, () => data.tables.map((t) => t.selected)],
   () => {
     let res = true
     if (importDataOnly) {
       for (const tn of Object.keys(srcDestMapping.value)) {
+        // Excluded sheets aren't uploaded, so their mapping needn't be valid.
+        if (isSheetExcluded(tn)) continue
         let flag = false
         if (atLeastOneEnabledValidation(tn)) {
           res = false
@@ -676,9 +682,9 @@ async function importViaJob() {
     const groups = new Map<any, typeof data.tables>()
     for (const table of data.tables) {
       // Skip sheets the user excluded via the per-sheet checkbox — they never
-      // enter the job payload, which is why no backend change is needed.
-      // Included sheets are guaranteed to have a selected field by validation.
-      if (!importDataOnly && table.selected === false) continue
+      // enter the job payload (both new-table and upload-into-existing imports),
+      // which is why no backend change is needed.
+      if (table.selected === false) continue
 
       const key = table._serverAttachment
       if (!groups.has(key)) groups.set(key, [] as any)
@@ -959,6 +965,9 @@ const getErrorForTable = (tableIdx: number) => {
 }
 
 function getErrorByTableName(tableName: string) {
+  // Excluded sheets aren't uploaded, so they must not surface an error.
+  if (isSheetExcluded(tableName)) return []
+
   const errors = []
 
   const atLeastOneEnabledValidationErr = atLeastOneEnabledValidation(tableName)
@@ -1019,6 +1028,13 @@ function getErrorByTableName(tableName: string) {
                 'w-full': isImporting,
               }"
             >
+              <span v-if="!isImporting && showSheetSelection" class="flex flex-none" @click.stop>
+                <NcCheckbox
+                  v-model:checked="table.selected"
+                  v-e="['c:quick-import:sheet:toggle']"
+                  :data-testid="`nc-import-sheet-select-${table.table_name}`"
+                />
+              </span>
               <div class="w-8 h-8 flex items-center justify-center bg-nc-bg-gray-extralight rounded-md">
                 <GeneralIcon :icon="tableIcon" class="w-5 h-5" />
               </div>
@@ -1027,6 +1043,12 @@ function getErrorByTableName(tableName: string) {
                   {{ table.table_name }}
                 </span>
               </NcTooltip>
+              <span
+                v-if="showSheetSelection && table.selected === false"
+                class="flex-none text-bodySm text-nc-content-gray-subtle2 whitespace-nowrap"
+              >
+                {{ $t('activity.sheetExcludedFromImport') }}
+              </span>
               <NcTooltip v-if="!isImporting && getErrorByTableName(table.table_name).length" class="ml-2">
                 <template #title>
                   <div v-for="(err, idx) of getErrorByTableName(table.table_name)" :key="idx" class="mb-1 last-of-type:mb-0">
@@ -1037,7 +1059,7 @@ function getErrorByTableName(tableName: string) {
                   <GeneralIcon icon="ncInfo" class="text-nc-content-red-dark" />
                 </NcBadge>
               </NcTooltip>
-              <div v-if="isImporting" class="w-[150px]">
+              <div v-if="isImporting && table.selected !== false" class="w-[150px]">
                 <a-progress
                   :percent="importingTableTips[table.table_name] ?? 0"
                   size="small"
@@ -1048,7 +1070,11 @@ function getErrorByTableName(tableName: string) {
               </div>
             </div>
           </template>
-          <div v-if="srcDestMapping" class="bg-nc-bg-gray-extralight pl-4 flex-1 flex">
+          <div
+            v-if="srcDestMapping"
+            class="bg-nc-bg-gray-extralight pl-4 flex-1 flex"
+            :class="{ 'opacity-50 pointer-events-none': table.selected === false }"
+          >
             <NcTable
               class="template-form flex-1 max-h-[310px]"
               header-row-class-name="relative"
