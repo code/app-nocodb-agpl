@@ -93,7 +93,9 @@ export class BaseMembersV3Service {
           }
           userEmail = user.email;
         } else if ('email' in baseUser && baseUser.email) {
-          user = await User.getByEmail(baseUser.email, ncMeta);
+          // canonical lookup so we match the same row the invite action
+          // resolves — avoids creating duplicate users for alias/variant emails
+          user = await User.getByCanonicalEmail(baseUser.email, ncMeta);
           userEmail = baseUser.email;
         } else {
           NcError.get(context).invalidRequestBody(
@@ -207,7 +209,7 @@ export class BaseMembersV3Service {
 
       // if email is provided, then we need to find the user id
       if (!baseUser.id && baseUser.email) {
-        const user = await User.getByEmail(baseUser.email);
+        const user = await User.getByCanonicalEmail(baseUser.email);
         if (user) {
           userId = user.id;
         } else {
