@@ -100,6 +100,14 @@ export const groupBy = (baseModel: IBaseModelSqlV2, logger: Logger) => {
     const { where, ...rest } = baseModel._getListArgs(args as any);
 
     args.column_name = args.column_name || '';
+
+    // minCount comes from the query string as text; coerce to a number so the
+    // HAVING `COUNT(..) >= ?` bind isn't bound as text. SQLite compares
+    // INTEGER < TEXT by storage class, so `COUNT(..) >= '2'` is always false
+    // (0 groups); pg/mysql/oracle coerce the param, sqlite does not.
+    if (args.minCount !== undefined) {
+      args.minCount = Number(args.minCount);
+    }
     const subGroupColumnName = args.subGroupColumnName;
 
     const columns = await baseModel.model.getColumns(baseModel.context);
@@ -690,6 +698,14 @@ export const groupBy = (baseModel: IBaseModelSqlV2, logger: Logger) => {
     const { where } = baseModel._getListArgs(args as any);
 
     args.column_name = args.column_name || '';
+
+    // minCount comes from the query string as text; coerce to a number so the
+    // HAVING `COUNT(..) >= ?` bind isn't bound as text. SQLite compares
+    // INTEGER < TEXT by storage class, so `COUNT(..) >= '2'` is always false
+    // (0 groups); pg/mysql/oracle coerce the param, sqlite does not.
+    if (args.minCount !== undefined) {
+      args.minCount = Number(args.minCount);
+    }
 
     const selectors = [];
     const groupBySelectors = [];
