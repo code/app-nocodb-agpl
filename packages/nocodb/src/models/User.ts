@@ -198,15 +198,19 @@ export default class User implements UserType {
         `${CacheScope.USER}:${email}`,
         CacheGetType.TYPE_OBJECT,
       ));
-    if (!user) {
-      user = await ncMeta.metaGet2(
-        RootScopes.ROOT,
-        RootScopes.ROOT,
-        MetaTable.USERS,
-        {
-          email,
-        },
-      );
+    if (!user && email) {
+      // Resolve to a LIVE row, never a soft-deleted one. A bare metaGet2 returns
+      // a single arbitrary matching row without filtering is_deleted; if a
+      // soft-deleted duplicate sorts first, this method would return null even
+      // when live rows exist — making callers treat the user as new and mint
+      // endless duplicate accounts. Filter is_deleted in the query itself.
+      user = await ncMeta
+        .knex(MetaTable.USERS)
+        .where({ email })
+        .where(function () {
+          this.where('is_deleted', false).orWhereNull('is_deleted');
+        })
+        .first();
 
       if (user) {
         user.meta = parseMetaProp(user);
@@ -239,15 +243,17 @@ export default class User implements UserType {
         `${CacheScope.USER}:canonical:${canonical}`,
         CacheGetType.TYPE_OBJECT,
       ));
-    if (!user) {
-      user = await ncMeta.metaGet2(
-        RootScopes.ROOT,
-        RootScopes.ROOT,
-        MetaTable.USERS,
-        {
-          canonical_email: canonical,
-        },
-      );
+    if (!user && canonical) {
+      // Resolve to a LIVE row, never a soft-deleted one — see getByEmail. A
+      // soft-deleted duplicate that sorts ahead of live rows would otherwise make
+      // this return null and cause callers to create endless duplicate accounts.
+      user = await ncMeta
+        .knex(MetaTable.USERS)
+        .where({ canonical_email: canonical })
+        .where(function () {
+          this.where('is_deleted', false).orWhereNull('is_deleted');
+        })
+        .first();
 
       if (user) {
         user.meta = parseMetaProp(user);
