@@ -4,10 +4,14 @@ interface Props {
   sourceId?: string
   showSourceSelector?: boolean
   forceLayout?: 'vertical' | 'horizontal'
+  // When uploading data into an existing table (no DDL), gate on `is_data_readonly`
+  // instead of `is_schema_readonly` — schema edit isn't required to append rows.
+  importDataOnly?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   showSourceSelector: true,
+  importDataOnly: false,
 })
 
 const emits = defineEmits(['update:sourceId'])
@@ -31,11 +35,22 @@ const sourceList = computed(() => {
   return (base.value?.sources || [])?.map((source, idx) => {
     const isHidden = source.enabled === false
 
-    const ncItemTooltip = isHidden
-      ? t('tooltip.sourceVisibilityIsHidden')
-      : source.is_schema_readonly
-      ? t('tooltip.schemaChangeDisabled')
-      : ''
+    const isSchemaReadonly = !!source.is_schema_readonly
+
+    const isDataReadonly = !!source.is_data_readonly
+
+    // Data-only upload writes rows (DML), so it's blocked by a data-readonly source.
+    // Creating a new table from the file does DDL + inserts rows, so it's blocked by either.
+    const isReadonlyForImport = props.importDataOnly ? isDataReadonly : isSchemaReadonly || isDataReadonly
+
+    let ncItemTooltip = ''
+    if (isHidden) {
+      ncItemTooltip = t('tooltip.sourceVisibilityIsHidden')
+    } else if (isReadonlyForImport) {
+      // Schema-readonly is the blocking reason only in the create-table flow; otherwise it's data.
+      ncItemTooltip =
+        !props.importDataOnly && isSchemaReadonly ? t('tooltip.schemaChangeDisabled') : t('tooltip.dataChangeDisabled')
+    }
 
     let sourceLabel = t('general.default')
 
@@ -48,7 +63,7 @@ const sourceList = computed(() => {
     return {
       label: sourceLabel,
       value: source.id,
-      ncItemDisabled: isHidden || source.is_schema_readonly,
+      ncItemDisabled: isHidden || isReadonlyForImport,
       ncItemTooltip,
       ...source,
     }
