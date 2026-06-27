@@ -198,6 +198,14 @@ export default class User implements UserType {
         `${CacheScope.USER}:${email}`,
         CacheGetType.TYPE_OBJECT,
       ));
+
+    // A cached soft-deleted row must not short-circuit the live lookup. The old
+    // code cached deleted rows under this key (the set ran before the is_deleted
+    // check), and cloud Redis isn't flushed on deploy — so treat a cached
+    // soft-deleted hit as a miss and re-query (the query below excludes
+    // soft-deleted rows and re-caches a live one, healing the poisoned entry).
+    if (user && user.is_deleted) user = null;
+
     if (!user && email) {
       // Resolve to a LIVE row, never a soft-deleted one. A bare metaGet2 returns
       // a single arbitrary matching row without filtering is_deleted; if a
@@ -243,6 +251,11 @@ export default class User implements UserType {
         `${CacheScope.USER}:canonical:${canonical}`,
         CacheGetType.TYPE_OBJECT,
       ));
+
+    // A cached soft-deleted row must not short-circuit the live lookup — see
+    // getByEmail. Treat a cached soft-deleted hit as a miss and re-query.
+    if (user && user.is_deleted) user = null;
+
     if (!user && canonical) {
       // Resolve to a LIVE row, never a soft-deleted one — see getByEmail. A
       // soft-deleted duplicate that sorts ahead of live rows would otherwise make

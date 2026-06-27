@@ -133,13 +133,14 @@ async function repointLinkTable(
  */
 async function pickSurvivor(knex: Knex, rows: UserRow[]): Promise<UserRow> {
   const ids = rows.map((r) => r.id);
-  const withMembership = new Set<string>(
-    (
-      await knex(MetaTable.WORKSPACE_USER)
-        .whereIn('fk_user_id', ids)
-        .distinct('fk_user_id')
-    ).map((r) => r.fk_user_id),
-  );
+  const withMembership = new Set<string>();
+  // guard with hasTable for consistency with the link-table handling
+  if (await knex.schema.hasTable(MetaTable.WORKSPACE_USER)) {
+    const memberRows = await knex(MetaTable.WORKSPACE_USER)
+      .whereIn('fk_user_id', ids)
+      .distinct('fk_user_id');
+    for (const r of memberRows) withMembership.add(r.fk_user_id);
+  }
 
   const score = (r: UserRow) =>
     (withMembership.has(r.id) ? 2 : 0) + (r.password ? 1 : 0);
@@ -165,7 +166,9 @@ const up = async (knex: Knex) => {
   while (true) {
     const users: UserRow[] = await knex(MetaTable.USERS)
       .select('id', 'email', 'canonical_email')
-      .whereNot('is_deleted', true)
+      .where(function () {
+        this.where('is_deleted', false).orWhereNull('is_deleted');
+      })
       .orderBy('id')
       .offset(offset)
       .limit(BATCH_SIZE);
@@ -188,7 +191,9 @@ const up = async (knex: Knex) => {
   // ---- Pass 2: merge rows that now share a canonical email -----------------
   const dupGroups: { canonical_email: string }[] = await knex(MetaTable.USERS)
     .select('canonical_email')
-    .whereNot('is_deleted', true)
+    .where(function () {
+      this.where('is_deleted', false).orWhereNull('is_deleted');
+    })
     .whereNotNull('canonical_email')
     .groupBy('canonical_email')
     .havingRaw('count(*) > 1');
@@ -199,7 +204,9 @@ const up = async (knex: Knex) => {
     const rows: UserRow[] = await knex(MetaTable.USERS)
       .select('id', 'email', 'canonical_email', 'password', 'is_deleted', 'created_at')
       .where('canonical_email', canonical_email)
-      .whereNot('is_deleted', true);
+      .where(function () {
+        this.where('is_deleted', false).orWhereNull('is_deleted');
+      });
 
     if (rows.length < 2) continue;
 
