@@ -42,6 +42,13 @@ const buildUuidGroupBySelector = ({
   return baseModel.dbDriver.raw('?? as ??', [columnName, alias]);
 };
 
+// Oracle TIMESTAMP WITH [LOCAL] TIME ZONE columns must be normalized to UTC
+// (SYS_EXTRACT_UTC) before bucketing so group keys match the read path (which
+// renders them AT TIME ZONE '+00:00'); plain TIMESTAMP columns already store
+// UTC wall time, and SYS_EXTRACT_UTC would raise ORA-30175 on them.
+const isWithTimeZone = (column: Column): boolean =>
+  (column.dt ?? '').toLowerCase().includes('time zone');
+
 // Returns a SQL expression that converts blank (null or '') values to NULL
 const sqlNullIfBlank = ({
   baseModel,
@@ -86,6 +93,21 @@ const sqlNullIfBlank = ({
 };
 
 export const groupBy = (baseModel: IBaseModelSqlV2, logger: Logger) => {
+  // Wrap a subquery as a derived table with an alias, deferring the dialect's
+  // table-alias syntax to the query client (Oracle forbids `AS` on a table
+  // alias; the rest use `(..) as ..`).
+  const aliasDerivedTable = (
+    sub: Knex.QueryBuilder | Knex.Raw,
+    alias: string,
+  ): Knex.Raw =>
+    DBQueryClient.get(
+      baseModel.dbDriver.clientType() as ClientType,
+    ).tableAlias(
+      baseModel.dbDriver,
+      baseModel.dbDriver.raw('(??)', [sub]),
+      alias,
+    );
+
   const list = async (args: {
     where?: string;
     column_name: string;
@@ -278,9 +300,16 @@ export const groupBy = (baseModel: IBaseModelSqlV2, logger: Logger) => {
             // minute (matching pg/mysql/sqlite/mssql above) via TRUNC on a DATE
             // cast. DATE(??) below would raise ORA-00904. Keep this in lockstep
             // with the count() datetime branch so list/count group identically.
-            columnQuery = baseModel.dbDriver.raw("TRUNC(CAST(?? AS DATE), 'MI')", [
-              columnName,
-            ]);
+            // TIMESTAMP WITH [LOCAL] TIME ZONE columns are normalized to UTC
+            // first (SYS_EXTRACT_UTC) so buckets match the read path, which
+            // renders these AT TIME ZONE '+00:00'; a raw CAST buckets by the
+            // value's own offset / session TZ. Mirrors the date-formula fix.
+            columnQuery = baseModel.dbDriver.raw(
+              isWithTimeZone(column)
+                ? "TRUNC(CAST(SYS_EXTRACT_UTC(??) AS DATE), 'MI')"
+                : "TRUNC(CAST(?? AS DATE), 'MI')",
+              [columnName],
+            );
           } else {
             columnQuery = baseModel.dbDriver.raw('DATE(??)', [columnName]);
           }
@@ -513,13 +542,7 @@ export const groupBy = (baseModel: IBaseModelSqlV2, logger: Logger) => {
             ['count', ...subGroupCountBindings, ...aliasBindings],
           ),
         )
-        // Oracle forbids `AS` on a table alias; mssql accepts either form.
-        .from(
-          baseModel.dbDriver.raw(
-            baseModel.isOracle ? '(??) ??' : '(??) as ??',
-            [qb, '__nc_grp_src__'],
-          ),
-        );
+        .from(aliasDerivedTable(qb, '__nc_grp_src__'));
 
       if (groupBySelectors.length) {
         grouped.groupByRaw(aliasRefs.join(', '), aliasBindings);
@@ -892,12 +915,17 @@ export const groupBy = (baseModel: IBaseModelSqlV2, logger: Logger) => {
               } else if (baseModel.isOracle) {
                 // Oracle has no DATE() function; truncate the timestamp to the
                 // minute (matching pg/mysql/sqlite/mssql above) via TRUNC on a
-                // DATE cast. DATE(??) below would raise ORA-00904.
+                // DATE cast. DATE(??) below would raise ORA-00904. TIMESTAMP
+                // WITH [LOCAL] TIME ZONE columns are normalized to UTC first
+                // (SYS_EXTRACT_UTC) so buckets match the read path — see the
+                // list() datetime branch.
                 selectors.push(
-                  baseModel.dbDriver.raw("TRUNC(CAST(?? AS DATE), 'MI') as ??", [
-                    columnName,
-                    getAs(column),
-                  ]),
+                  baseModel.dbDriver.raw(
+                    isWithTimeZone(column)
+                      ? "TRUNC(CAST(SYS_EXTRACT_UTC(??) AS DATE), 'MI') as ??"
+                      : "TRUNC(CAST(?? AS DATE), 'MI') as ??",
+                    [columnName, getAs(column)],
+                  ),
                 );
               } else {
                 selectors.push(
@@ -1035,36 +1063,16 @@ export const groupBy = (baseModel: IBaseModelSqlV2, logger: Logger) => {
     }
 
     let qbP: Knex.QueryBuilder;
-    if (baseModel.isMssql) {
-      // mssql: nested derived tables —
+    if (baseModel.isMssql || baseModel.isOracle) {
+      // mssql/oracle: project the group keys into a derived table and GROUP BY
+      // those real columns —
       //   SELECT count(*) FROM (
-      //     SELECT <aliases> FROM (qb) sub GROUP BY <aliases>
+      //     SELECT <aliases> FROM (qb) sub GROUP BY <aliases> [HAVING ...]
       //   ) grouped
-      const aliasRefs = groupBySelectors.map(() => '??');
-      const aliasBindings = groupBySelectors;
-
-      const inner = baseModel.dbDriver
-        .select(
-          groupBySelectors.length
-            ? baseModel.dbDriver.raw(aliasRefs.join(', '), aliasBindings)
-            : baseModel.dbDriver.raw('1'),
-        )
-        .from(baseModel.dbDriver.raw('(??) as ??', [qb, 'sub']));
-
-      if (groupBySelectors.length) {
-        inner.groupByRaw(aliasRefs.join(', '), aliasBindings);
-      }
-
-      qbP = baseModel.dbDriver
-        .count('*', { as: 'count' })
-        .from(baseModel.dbDriver.raw('(??) as ??', [inner, 'grouped']));
-    } else if (baseModel.isOracle) {
-      // oracle: project the group keys into a derived table and GROUP BY those
-      // real columns — same idea as mssql. Oracle < 23c rejects GROUP BY on a
-      // SELECT alias (ORA-00904) and every version rejects GROUP BY on a
-      // subquery-valued alias (ORA-22818, lookup/rollup keys). The optimizer
-      // merges the inline projection, so the plan matches a direct GROUP BY.
-      // Oracle forbids `AS` on a table alias, so the derived tables use `(??) ??`.
+      // mssql can't GROUP BY a select alias; oracle < 23c can't either
+      // (ORA-00904) and no oracle version can GROUP BY a subquery-valued alias
+      // (ORA-22818, lookup/rollup keys). The optimizer merges the inline
+      // projection, so the plan matches a direct GROUP BY.
       const aliasRefs = groupBySelectors.map(() => '??').join(', ');
       const inner = baseModel.dbDriver
         .select(
@@ -1072,11 +1080,12 @@ export const groupBy = (baseModel: IBaseModelSqlV2, logger: Logger) => {
             ? baseModel.dbDriver.raw(aliasRefs, groupBySelectors)
             : baseModel.dbDriver.raw('1'),
         )
-        .from(baseModel.dbDriver.raw('(??) ??', [qb, 'sub']));
+        .from(aliasDerivedTable(qb, 'sub'));
 
       if (groupBySelectors.length) {
         inner.groupByRaw(aliasRefs, groupBySelectors);
 
+        // Filter to groups with at least minCount rows (duplicates-only).
         if (args.minCount !== undefined && args.minCount > 0) {
           inner.havingRaw('COUNT(*) >= ?', [args.minCount]);
         }
@@ -1084,7 +1093,7 @@ export const groupBy = (baseModel: IBaseModelSqlV2, logger: Logger) => {
 
       qbP = baseModel.dbDriver
         .count('*', { as: 'count' })
-        .from(baseModel.dbDriver.raw('(??) ??', [inner, 'grouped']));
+        .from(aliasDerivedTable(inner, 'grouped'));
     } else {
       // Wrap in a CTE so that we can reference grouped columns safely in all engines
       // SELECT COUNT(*) FROM (WITH grouped AS (<qb>) SELECT * FROM grouped g) sub
