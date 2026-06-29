@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { isVirtualCol, NcApiVersion, UITypes } from 'nocodb-sdk';
 import type {
+  ColumnReqType,
   ColumnType,
   FieldV3Type,
   TableCreateV3Type,
@@ -195,6 +196,51 @@ export class TablesV3Service {
     ) as unknown as TableV3Type[];
   }
 
+  // Build the `dtxp` enum/set value list for a select column from its
+  // colOptions.options titles, mirroring the per-field columnsService.columnAdd
+  // logic. Without this the bulk table-create path emits a value-less enum.
+  protected setSelectColumnDtxp(context: NcContext, column: ColumnReqType) {
+    const col = column as ColumnReqType & {
+      colOptions?: { options?: { title?: string }[] };
+      dtxp?: string;
+    };
+
+    if (
+      ![UITypes.SingleSelect, UITypes.MultiSelect].includes(col.uidt as UITypes)
+    ) {
+      return;
+    }
+
+    const options = col.colOptions?.options;
+
+    // No choices at all → emit a single empty-string member so MySQL produces a
+    // valid `enum('')`/`set('')` rather than a value-less `enum` (ER_PARSE_ERROR).
+    // Harmless on Postgres/SQLite where select maps to text. Mirrors the
+    // per-field columnsService.columnAdd MySQL fallback.
+    if (!options?.length) {
+      col.dtxp = "''";
+      return;
+    }
+
+    col.dtxp = options
+      .map((opt) => {
+        const title = opt.title ?? '';
+        // Reject empty option values, mirroring the per-field path.
+        if (title === '') {
+          NcError.get(context).invalidRequestBody(
+            'Empty options are not allowed!',
+          );
+        }
+        if (col.uidt === UITypes.MultiSelect && title.includes(',')) {
+          NcError.get(context).invalidRequestBody(
+            "Illegal char(',') for MultiSelect",
+          );
+        }
+        return `'${title.replace(/'/gi, "''")}'`;
+      })
+      .join(',');
+  }
+
   @TraceCommand(OperationName.tableV3Create)
   async tableCreate(
     context: NcContext,
@@ -233,9 +279,26 @@ export class TablesV3Service {
         }
       }
 
+      const builtColumns = (
+        columns?.length ? columnV3ToV2Builder().build(columns) : []
+      ) as ColumnReqType[];
+
+      // The V3 builder expands select `choices` into `colOptions.options` but
+      // does not populate `dtxp` (the enum/set value list). The bulk
+      // table-create path goes straight to tablesService.tableCreate and the
+      // raw SQL builder, which — unlike the per-field columnsService.columnAdd
+      // path — never derives `dtxp` from colOptions. Without it,
+      // SingleSelect/MultiSelect columns emit a value-less `enum`/`set` on
+      // MySQL (ER_PARSE_ERROR; harmless on Postgres/SQLite where select maps
+      // to text). Derive it here so MySQL gets `enum('up','down')`, matching
+      // the per-field endpoint.
+      for (const col of builtColumns) {
+        this.setSelectColumnDtxp(context, col);
+      }
+
       const tableCreateReq = {
         ...param.table,
-        columns: columns?.length ? columnV3ToV2Builder().build(columns) : [],
+        columns: builtColumns,
       } as TableReqType;
 
       tableCreateOutput = await this.tablesService.tableCreate(context, {
