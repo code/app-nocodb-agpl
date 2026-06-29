@@ -311,6 +311,11 @@ const onClick = (e: Event) => {
         }"
       />
 
+      <SmartsheetHeaderDescriptionTooltip
+        v-if="column.description?.length && isExpandedForm && !hideMenu"
+        :description="column.description"
+      />
+
       <div class="flex-1" />
       <NcTooltip
         v-if="meta?.synced && column?.readonly && isExpandedForm && !isPublic"
