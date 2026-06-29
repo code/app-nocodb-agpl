@@ -45,7 +45,11 @@ const isCalendar = inject(IsCalendarInj, ref(false))
 
 const { isUserViewOwner } = useViewsStore()
 
-const isRestrictedEditor = computed(() => !isPublic.value && (isLocked.value || !canSyncSort.value))
+const { isSharedBase } = storeToRefs(useBase())
+
+// Shared bases never set IsPublicInj (isPublic stays false) but allow local-only
+// sort edits like shared views — they must not be treated as restricted editors.
+const isRestrictedEditor = computed(() => !isPublic.value && !isSharedBase.value && (isLocked.value || !canSyncSort.value))
 
 // True when user is viewing a personal view they don't own
 const isPersonalViewNonOwner = computed(() => view.value?.lock_type === ViewLockType.Personal && !isUserViewOwner(view.value))
