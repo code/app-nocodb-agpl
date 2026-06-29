@@ -12,6 +12,10 @@ const { isSqlView } = useSmartsheetStoreOrThrow()
 
 const expandedFormStore = useExpandedFormStoreOrThrow()
 
+// Audit (revision history) is hidden in public/shared bases — the backend
+// blocks the read; offering an empty/forbidden tab makes no sense there.
+const { isAuditEnabled } = expandedFormStore
+
 const { isExpandedFormCommentMode } = storeToRefs(useConfigStore())
 
 const tab = ref<'fields' | 'comments' | 'audits'>(
@@ -66,7 +70,7 @@ const isNarrow = computed(() => sidebarWidth.value > 0 && sidebarWidth.value < T
         <SmartsheetExpandedFormSidebarComments />
       </a-tab-pane>
 
-      <a-tab-pane v-if="!isSqlView" key="audits" class="w-full">
+      <a-tab-pane v-if="!isSqlView && isAuditEnabled" key="audits" class="w-full">
         <template #tab>
           <NcTooltip :disabled="!isNarrow" :title="$t('labels.revisionHistory')">
             <div v-e="['c:row-expand:audit']" class="flex items-center gap-2">

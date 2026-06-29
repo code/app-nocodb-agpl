@@ -63,7 +63,13 @@ const [useProvideExpandedFormStore, useExpandedFormStore] = useInjectionState(
 
     const { basesUser } = storeToRefs(basesStore)
 
-    const { base } = storeToRefs(useBase())
+    const { base, isSharedBase } = storeToRefs(useBase())
+
+    // Record audit is unavailable in public/shared bases — the backend blocks
+    // `recordAuditList` there (CVE GHSA-6297-qpqf-235w). Drives the audit tab
+    // visibility, the discussion-mode feed, and the fetch guard so the UI
+    // never offers audit (and never fires a request that would 403).
+    const isAuditEnabled = computed(() => !isPublic.value && !isSharedBase.value)
 
     const baseUsers = computed(() => (meta.value.base_id ? basesUser.value.get(meta.value.base_id) || [] : []))
 
@@ -237,6 +243,9 @@ const [useProvideExpandedFormStore, useExpandedFormStore] = useInjectionState(
     const hasMoreAudits = ref(false)
 
     const loadAudits = async (_rowId?: string, showLoading = true) => {
+      // No audit in public/shared bases — the backend 403s recordAuditList
+      // there, and the audit tab + discussion entries are hidden accordingly.
+      if (!isAuditEnabled.value) return
       if (!isUIAllowed('recordAuditList') || (!row.value && !_rowId)) return
 
       const rowId = _rowId ?? extractPkFromRow(row.value.row, meta.value.columns as ColumnType[])
@@ -919,6 +928,7 @@ const [useProvideExpandedFormStore, useExpandedFormStore] = useInjectionState(
       loadComments,
       deleteComment,
       loadAudits,
+      isAuditEnabled,
       comments,
       audits,
       isAuditLoading,

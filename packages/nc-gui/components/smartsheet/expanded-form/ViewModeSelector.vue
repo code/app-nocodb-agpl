@@ -24,6 +24,8 @@ const { isUIAllowed } = useRoles()
 
 const isPublic = inject(IsPublicInj, ref(false))
 
+const { isSharedBase } = storeToRefs(useBase())
+
 const { isSqlView } = useSmartsheetStoreOrThrow()
 
 const { isNew, commentsDrawer, baseRoles } = useExpandedFormStoreOrThrow()
@@ -61,7 +63,10 @@ const items = computed(() => {
       icon: modelValue.value === ExpandedFormMode.DISCUSSION ? 'ncMessageSquare1Solid' : 'ncMessageSquare1Outline',
       value: ExpandedFormMode.DISCUSSION,
       tooltip: t('labels.discussion'),
-      hidden: isSqlView.value,
+      // Hidden in shared bases: Discussion interleaves comments + audits, and
+      // audit reads are blocked there (CVE GHSA-6297-qpqf-235w). Other modes
+      // (Fields, Attachment) stay available.
+      hidden: isSqlView.value || isSharedBase.value,
       locked: isEEFeatureBlocked.value,
     },
   ].filter((i) => !i.hidden) as ItemType[]
