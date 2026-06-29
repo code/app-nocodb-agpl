@@ -42,7 +42,13 @@ const { $e } = useNuxtApp()
 
 const { isUserViewOwner, updateViewMeta } = useViewsStore()
 
-const isRestrictedEditor = computed(() => !isPublic.value && (isLocked.value || !canSyncGroupBy.value))
+const { isSharedBase } = storeToRefs(useBase())
+
+// Shared bases never set IsPublicInj (isPublic stays false) but allow local-only
+// group-by edits like shared views. Without this, isRestrictedEditor stays true
+// in a shared base, so groupedByColumnIds reads the empty synced state and
+// removeFieldFromGroupBy early-returns — the deleted group never clears.
+const isRestrictedEditor = computed(() => !isPublic.value && !isSharedBase.value && (isLocked.value || !canSyncGroupBy.value))
 
 const isPersonalViewNonOwner = computed(() => view.value?.lock_type === ViewLockType.Personal && !isUserViewOwner(view.value))
 
@@ -259,10 +265,21 @@ const removeFieldFromGroupBy = async (group: Group) => {
 
 watch(open, () => {
   if (open.value) {
-    // Always show the persisted (synced) state. Restricted editors can't
-    // modify the view, so they see the saved state as-is. Full editors work
-    // directly on the synced state via saveGroupBy → updateGridViewColumn.
-    _groupBy.value = [...syncedGroupByEntries.value]
+    // In local mode (public view / shared base) the applied group-by lives in
+    // `localGroupBy` (incl. empty []), not the synced view columns — seed the
+    // editor from it so reopening the dropdown shows the rows (matches
+    // `groupedByColumnIds`). Otherwise (creators/editors synced, or read-only
+    // locked / others' personal) show the persisted synced state.
+    if (!isRestrictedEditor.value && localGroupBy.value !== null) {
+      _groupBy.value = localGroupBy.value.map((e, i) => ({
+        fk_column_id: e.column.id,
+        sort: e.sort,
+        order: i + 1,
+        enabled: e.enabled ?? true,
+      }))
+    } else {
+      _groupBy.value = [...syncedGroupByEntries.value]
+    }
   } else {
     showCreateGroupBy.value = false
   }
@@ -272,6 +289,9 @@ watch(open, () => {
 watch(syncedGroupByEntries, (next) => {
   if (!open.value) return
   if (isSavingGroupBy.value) return
+  // In local mode the local override is the source of truth — a synced refresh
+  // must not wipe the user's locally-added group-by.
+  if (!isRestrictedEditor.value && localGroupBy.value !== null) return
   _groupBy.value = [...next]
 })
 
