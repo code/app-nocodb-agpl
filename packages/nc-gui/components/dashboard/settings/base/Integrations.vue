@@ -38,8 +38,6 @@ const {
 
 const { isEEFeatureBlocked } = useEeConfig()
 
-const { isFeatureEnabled } = useBetaFeatureToggle()
-
 const { isSyncFeatureEnabled } = storeToRefs(useSyncStore())
 
 const canEditIntegration = (integration: IntegrationType) => {
@@ -109,10 +107,6 @@ const integrationsMap = computed(() => {
           i.isAvailable &&
           // OSS-only (e.g. SQLite) only on free, self-hosted (CE + unlicensed On-Prem)
           (isEEFeatureBlocked.value || !i.isOssOnly) &&
-          // SQL Server is experimental — hidden unless the `mssql_source` flag is on
-          (i.sub_type !== ClientType.MSSQL || isFeatureEnabled(FEATURE_FLAG.MSSQL_SOURCE)) &&
-          // Oracle is experimental — hidden unless the `oracle_source` flag is on
-          (i.sub_type !== ClientType.ORACLE || isFeatureEnabled(FEATURE_FLAG.ORACLE_SOURCE)) &&
           i.sub_type !== SyncDataType.NOCODB &&
           // AUTH category: only show integrations available for sync auth
           (cat.value !== IntegrationCategoryType.AUTH ||

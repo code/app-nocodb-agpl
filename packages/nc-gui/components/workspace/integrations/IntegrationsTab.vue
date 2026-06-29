@@ -3,7 +3,7 @@ import type { VNodeRef } from '@vue/runtime-core'
 import { IntegrationCategoryType, PlanFeatureTypes } from 'nocodb-sdk'
 import NcModal from '~/components/nc/Modal.vue'
 
-import { ClientType, type IntegrationItemType, SyncDataType } from '#imports'
+import { type IntegrationItemType, SyncDataType } from '#imports'
 
 const props = withDefaults(
   defineProps<{
@@ -145,10 +145,6 @@ const getIntegrationsByCategory = (category: IntegrationCategoryType, query: str
     if (!isDataReflectionEnabled.value && i.sub_type === SyncDataType.NOCODB) return false
 
     if (i.hidden) return false
-
-    if (i.sub_type === ClientType.MSSQL && !isFeatureEnabled(FEATURE_FLAG.MSSQL_SOURCE)) return false
-
-    if (i.sub_type === ClientType.ORACLE && !isFeatureEnabled(FEATURE_FLAG.ORACLE_SOURCE)) return false
 
     return (
       isOssOnlyAllowed &&
