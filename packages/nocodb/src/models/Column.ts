@@ -1055,6 +1055,12 @@ export default class Column<T = any> implements ColumnType {
         const formula = await new Column(
           formulaCol,
         ).getColOptions<FormulaColumn>(context, ncMeta);
+
+        // Orphaned formula column: COLUMNS row carries uidt=Formula but its
+        // COL_FORMULA option row is already gone (FormulaColumn.read → null).
+        // Skip like the AI branch above instead of dereferencing null.
+        if (!formula) continue;
+
         if (
           formula.formula &&
           addFormulaErrorIfMissingColumn({
