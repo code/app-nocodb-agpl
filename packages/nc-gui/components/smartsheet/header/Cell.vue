@@ -283,6 +283,22 @@ const onClick = (e: Event) => {
           invisible: !(editColumnDropdown || isDropDownOpen),
         }"
       />
+      <NcTooltip
+        v-if="column.description?.length && isExpandedForm"
+        class="flex items-center ml-1"
+        placement="bottom"
+        overlay-class-name="nc-tooltip-scrollable"
+      >
+        <template #title>
+          <div class="whitespace-pre-wrap break-words">{{ column.description }}</div>
+        </template>
+        <GeneralIcon
+          icon="info"
+          class="nc-column-description-icon flex-none !w-3.5 !h-3.5 !text-nc-content-gray-muted"
+          data-testid="nc-expanded-field-description"
+          @click.stop
+        />
+      </NcTooltip>
       <div class="flex-1" />
       <NcTooltip v-if="isDateDependencyField && isExpandedForm && !isPublic" class="flex items-center" placement="bottom">
         <template #title> {{ $t('labels.dateDependency.enabled') }} </template>
