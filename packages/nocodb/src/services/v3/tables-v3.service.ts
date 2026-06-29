@@ -213,11 +213,24 @@ export class TablesV3Service {
 
     const options = col.colOptions?.options;
 
-    if (!options?.length) return;
+    // No choices at all → emit a single empty-string member so MySQL produces a
+    // valid `enum('')`/`set('')` rather than a value-less `enum` (ER_PARSE_ERROR).
+    // Harmless on Postgres/SQLite where select maps to text. Mirrors the
+    // per-field columnsService.columnAdd MySQL fallback.
+    if (!options?.length) {
+      col.dtxp = "''";
+      return;
+    }
 
     col.dtxp = options
       .map((opt) => {
         const title = opt.title ?? '';
+        // Reject empty option values, mirroring the per-field path.
+        if (title === '') {
+          NcError.get(context).invalidRequestBody(
+            'Empty options are not allowed!',
+          );
+        }
         if (col.uidt === UITypes.MultiSelect && title.includes(',')) {
           NcError.get(context).invalidRequestBody(
             "Illegal char(',') for MultiSelect",
