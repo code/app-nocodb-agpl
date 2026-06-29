@@ -90,8 +90,6 @@ const activeIntegrationformState = ref<ProjectCreateForm>(defaultFormState())
 
 const isEnabledSaveChangesBtn = ref(false)
 
-const { isFeatureEnabled } = useBetaFeatureToggle()
-
 const { blockMssql, showUpgradeToUseMssql, blockOracle, showUpgradeToUseOracle } = useEeConfig()
 
 const easterEgg = ref(false)
@@ -125,12 +123,9 @@ const onEasterEgg = () => {
 }
 
 const clientTypes = computed(() => {
-  const mssqlEnabled = isFeatureEnabled(FEATURE_FLAG.MSSQL_SOURCE)
-  const oracleEnabled = isFeatureEnabled(FEATURE_FLAG.ORACLE_SOURCE)
-
   return _clientTypes.filter((type) => {
-    if (type.value === ClientType.MSSQL) return mssqlEnabled
-    if (type.value === ClientType.ORACLE) return oracleEnabled
+    // MSSQL/Oracle are EE-only — hidden in CE; in EE they're gated by their paid add-on.
+    if (!isEeUI && [ClientType.MSSQL, ClientType.ORACLE].includes(type.value)) return false
 
     return (
       ([ClientType.SNOWFLAKE, ClientType.DATABRICKS].includes(type.value) && easterEgg.value) ||
