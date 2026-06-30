@@ -288,6 +288,10 @@ const getHookTypeText = (hook: HookType) => {
       }
       case 'view': {
         prefix = `${t('objects.view')} : `
+        break
+      }
+      case 'comment': {
+        prefix = `${t('general.comment')} : `
       }
     }
 
