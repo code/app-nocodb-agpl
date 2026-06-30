@@ -180,7 +180,7 @@ watch(
     <div class="flex h-full relative flex-row" data-testid="nc-calendar-wrapper">
       <div
         ref="calendarBody"
-        class="flex flex-col w-full min-h-0"
+        class="flex flex-col w-full min-h-0 min-w-0"
         :class="{ 'overflow-y-auto nc-scrollbar-md': isHeightExpanded }"
       >
         <template v-if="calendarRange?.length">

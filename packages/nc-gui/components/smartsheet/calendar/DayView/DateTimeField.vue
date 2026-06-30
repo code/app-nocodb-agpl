@@ -15,7 +15,6 @@ const {
   updateRowProperty,
   displayField,
   sideBarFilterOption,
-  showSideMenu,
   updateFormat,
   timezoneDayjs,
   timezone,
@@ -27,8 +26,6 @@ const { isSyncedTable } = useSmartsheetStoreOrThrow()
 const { $e } = useNuxtApp()
 
 const container = ref<null | HTMLElement>(null)
-
-const { width: containerWidth } = useElementSize(container)
 
 const { isUIAllowed } = useRoles()
 
@@ -211,49 +208,6 @@ const hasSlotForRecord = (
   }
   return true
 }
-const getMaxOverlaps = ({
-  row,
-  columnArray,
-  graph,
-}: {
-  row: Row
-  columnArray: Array<Array<Row>>
-  graph: Map<string, Set<string>>
-}) => {
-  const visited: Set<string> = new Set()
-
-  const dfs = (id: string): number => {
-    visited.add(id)
-    let maxOverlaps = 1
-    const neighbors = graph.get(id)
-    if (neighbors) {
-      for (const neighbor of neighbors) {
-        if (maxOverlaps >= columnArray.length) return maxOverlaps
-        if (!visited.has(neighbor)) {
-          maxOverlaps = Math.min(Math.max(maxOverlaps, dfs(neighbor) + 1), columnArray.length)
-        }
-      }
-    }
-    return maxOverlaps
-  }
-
-  const id = row.rowMeta.id as string
-  if (graph.has(id)) {
-    dfs(id)
-  }
-
-  const overlapIterations: Array<number> = []
-
-  columnArray
-    .flat()
-    .filter((record) => visited.has(record.rowMeta.id!))
-    .forEach((record) => {
-      overlapIterations.push(record.rowMeta.overLapIteration!)
-    })
-
-  return Math.max(...overlapIterations)
-}
-
 const dragRecord = ref<Row | null>(null)
 
 const isDragging = ref(false)
@@ -280,7 +234,7 @@ const recordsAcrossAllRange = computed<{
     }
   >
 }>(() => {
-  if (!calendarRange.value || !formattedData.value) return { record: [], count: {} }
+  if (!calendarRange.value || !formattedData.value) return { record: [], spanningRecords: [], gridTimeMap: new Map() }
 
   const scheduleStart = timezoneDayjs.dayjsTz(selectedDate.value).startOf('day')
   const scheduleEnd = timezoneDayjs.dayjsTz(selectedDate.value).endOf('day')
@@ -472,96 +426,55 @@ const recordsAcrossAllRange = computed<{
     }
   }
 
-  const graph = new Map<string, Set<string>>()
-
-  // Build the graph
-  for (const [_gridTime, { id: ids }] of gridTimeMap) {
-    for (const id1 of ids) {
-      if (!graph.has(id1)) {
-        graph.set(id1, new Set())
-      }
-      for (const id2 of ids) {
-        if (id1 !== id2) {
-          graph.get(id1)!.add(id2)
-        }
-      }
+  // Overlap denominator: every card in a connected overlap cluster must divide by the SAME
+  // column count, or `width` (100% / N) and the column offset (`overLapIteration`) tile on
+  // different grids — a long record spanning from a sparse region into a denser one gets a
+  // smaller width unit than its short neighbours and renders on top of them. The greedy
+  // column packing above already colours each cluster with exactly its max-concurrency
+  // number of columns, so we union every record that co-occurs in a grid slot and give all
+  // members of a cluster its highest column index as `numberOfOverlaps`. Cards therefore
+  // fill the width when a cluster is sparse and shrink to the 48px min (outer wrapper
+  // scrolls) when it is busy — without ever overlapping.
+  const parent = new Map<string, string>()
+  const find = (x: string): string => {
+    let root = x
+    while (parent.get(root) !== root) root = parent.get(root)!
+    let cur = x
+    while (cur !== root) {
+      const next = parent.get(cur)!
+      parent.set(cur, root)
+      cur = next
     }
+    return root
+  }
+  const union = (a: string, b: string) => {
+    const ra = find(a)
+    const rb = find(b)
+    if (ra !== rb) parent.set(ra, rb)
   }
 
   for (const record of recordsByRange) {
-    const numberOfOverlaps = getMaxOverlaps({
-      row: record,
-      columnArray,
-      graph,
-    })
+    const id = `${record.rowMeta.id}`
+    if (!parent.has(id)) parent.set(id, id)
+  }
+  // Records sharing any grid slot are mutually overlapping; union them so a long record
+  // bridging two busy regions pulls both into one cluster (transitive via union-find).
+  for (const { id: slotIds } of gridTimeMap.values()) {
+    for (let i = 1; i < slotIds.length; i++) union(`${slotIds[0]}`, `${slotIds[i]}`)
+  }
 
-    record.rowMeta.numberOfOverlaps = numberOfOverlaps
+  const clusterMaxColumns = new Map<string, number>()
+  for (const record of recordsByRange) {
+    const root = find(`${record.rowMeta.id}`)
+    clusterMaxColumns.set(root, Math.max(clusterMaxColumns.get(root) ?? 1, record.rowMeta.overLapIteration ?? 1))
+  }
 
-    let width
-    let left = 100
-    let display = 'block'
-
-    const isRecordDraggingOrResizeState =
-      record.rowMeta.id === dragRecord.value?.rowMeta.id || record.rowMeta.id === resizeRecord.value?.rowMeta.id
-
-    if (isRecordDraggingOrResizeState || !numberOfOverlaps || numberOfOverlaps <= 0) {
-      record.rowMeta.style = {
-        ...record.rowMeta.style,
-        zIndex: 10,
-      }
-      left = 0
-      width = '100%'
-    } else {
-      const overlapIndex = record.rowMeta.overLapIteration
-
-      if (overlapIndex > 8) {
-        display = 'none'
-
-        // Add overflowing record to gridTimeMap
-        const fromCol = record.rowMeta.range?.fk_from_col
-        const toCol = record.rowMeta.range?.fk_to_col
-
-        if (fromCol) {
-          const { startDate, endDate } = calculateNewDates({
-            startDate: timezoneDayjs.timezonize(record.row[fromCol.title!]),
-            endDate:
-              toCol && dayjs(record.row[toCol.title!])?.isValid()
-                ? timezoneDayjs.timezonize(record.row[toCol.title!])
-                : timezoneDayjs.timezonize(record.row[fromCol.title!]).add(1, 'hour').subtract(1, 'minute'),
-            scheduleStart,
-            scheduleEnd,
-          })
-
-          const gridTimes = getGridTimeSlots(startDate, endDate)
-
-          for (let gridCounter = gridTimes.from; gridCounter <= gridTimes.to; gridCounter++) {
-            if (gridTimeMap.has(gridCounter)) {
-              const currentSlot = gridTimeMap.get(gridCounter)!
-              if (!currentSlot.overflowRecords.some((r) => r.rowMeta.id === record.rowMeta.id)) {
-                currentSlot.overflowRecords.push(record)
-                gridTimeMap.set(gridCounter, currentSlot)
-              }
-            }
-          }
-        }
-      } else {
-        const availableWidth = containerWidth.value - 70
-        width = Math.max(availableWidth / Math.min(numberOfOverlaps, 8), 180)
-
-        const spacing = (availableWidth - width * Math.min(numberOfOverlaps, 8)) / Math.max(Math.min(numberOfOverlaps, 8) - 1, 1)
-        left = (width + spacing) * (overlapIndex - 1)
-
-        if (left + width > availableWidth) {
-          width = Math.max(availableWidth - left - 1.5, 180)
-        }
-      }
-    }
+  for (const record of recordsByRange) {
+    record.rowMeta.numberOfOverlaps = clusterMaxColumns.get(find(`${record.rowMeta.id}`)) ?? 1
 
     record.rowMeta.style = {
       ...record.rowMeta.style,
-      display,
-      width: typeof width === 'number' ? `${width}px` : width,
-      left: `${left}px`,
+      display: 'block',
     }
   }
 
@@ -929,50 +842,6 @@ const dropEvent = (event: DragEvent) => {
   }
 }
 
-const isOverflowAcrossHourRange = (hour: dayjs.Dayjs) => {
-  if (!recordsAcrossAllRange.value || !recordsAcrossAllRange.value.gridTimeMap) return { isOverflow: false, overflowCount: 0 }
-  const { gridTimeMap } = recordsAcrossAllRange.value
-  const startMinute = hour.hour() * 60 + hour.minute()
-  const endMinute = hour.hour() * 60 + hour.minute() + 59
-  let overflowCount = 0
-
-  for (let minute = startMinute; minute <= endMinute; minute++) {
-    const recordCount = gridTimeMap.get(minute)?.count ?? 0
-    overflowCount = Math.max(overflowCount, recordCount)
-  }
-
-  return { isOverflow: overflowCount - 8 > 0, overflowCount: overflowCount - 8 }
-}
-
-const getOverflowRecords = (hour: dayjs.Dayjs) => {
-  if (!recordsAcrossAllRange.value || !recordsAcrossAllRange.value.gridTimeMap) return { isOverflow: false, overflowCount: 0 }
-  const { gridTimeMap } = recordsAcrossAllRange.value
-
-  const startMinute = hour.hour() * 60 + hour.minute()
-  const endMinute = hour.hour() * 60 + hour.minute() + 59
-
-  const uniqueRecords: Row[] = []
-  const uniqueRecordIds = new Set<string>()
-
-  for (let minute = startMinute; minute <= endMinute; minute++) {
-    const records = gridTimeMap?.get(minute)?.overflowRecords ?? []
-    for (const rec of records) {
-      if (!uniqueRecordIds.has(rec.rowMeta?.id)) {
-        uniqueRecords.push(rec)
-        uniqueRecordIds.add(rec.rowMeta?.id)
-      }
-    }
-  }
-
-  return uniqueRecords
-}
-
-const viewMore = (hour: dayjs.Dayjs) => {
-  sideBarFilterOption.value = 'selectedHours'
-  selectedTime.value = hour
-  showSideMenu.value = true
-}
-
 const selectHour = (hour: dayjs.Dayjs) => {
   selectedTime.value = hour
   dragRecord.value = null
@@ -1030,7 +899,7 @@ const expandRecord = (record: Row) => {
 </script>
 
 <template>
-  <div class="h-[calc(100vh-5.3rem)] overflow-y-auto nc-scrollbar-md">
+  <div class="h-[calc(100vh-5.3rem)] nc-scrollbar-md nc-scrollbar-x-md">
     <SmartsheetCalendarDateTimeSpanningContainer
       v-if="
         calendarRange.some((range) => range.fk_to_col !== null && range.fk_to_col !== undefined) &&
@@ -1039,171 +908,117 @@ const expandRecord = (record: Row) => {
       :records="recordsAcrossAllRange.spanningRecords"
       @expand-record="expandRecord"
     />
-    <div ref="container" class="w-full flex relative no-selection" data-testid="nc-calendar-day-view" @drop="dropEvent">
-      <div
-        v-if="shouldEnableOverlay"
-        class="absolute ml-0.5 pointer-events-none w-full z-4"
-        :style="{
-          top: `${overlayTop}px`,
-        }"
-      >
-        <div class="flex w-full items-center">
-          <span
-            class="text-nc-content-inverted-primary bg-nc-content-brand text-xs font-bold rounded-md pointer-events-auto leading-3.5 p-0.5 cursor-pointer"
-            @click="newRecord(currTime)"
-          >
-            {{ currTime.format(is12hrAxis ? 'hh:mm A' : 'HH:mm') }}
-          </span>
-          <div class="flex-1 relative ml-1 nc-calendar-border-line border-b-2 border-nc-border-brand"></div>
-        </div>
-      </div>
-
-      <div>
+    <!-- Inner wrapper: free size — grows to fit the flex-1 columns. The OUTER wrapper (above)
+         has the scrollbar; this never does. Records are laid out by CSS flex (no JS width
+         measurement → no ResizeObserver loop) and nothing is hidden behind "+N more". -->
+    <div ref="container" class="flex relative no-selection w-full" data-testid="nc-calendar-day-view" @drop="dropEvent">
+      <!-- Time-axis gutter: sticky so it stays put while the grid scrolls horizontally -->
+      <div class="sticky left-0 z-20 bg-nc-bg-default flex-none">
         <div
           v-for="(hour, index) in hours"
           :key="index"
-          class="flex h-13 relative border-1 group hover:bg-nc-bg-gray-extralight border-nc-base-white"
-          data-testid="nc-calendar-day-hour"
-          @click="selectHour(hour)"
-          @dblclick="newRecord(hour)"
+          class="flex h-13 relative border-1 border-nc-base-white border-b-nc-border-gray-light"
         >
-          <div class="w-16 border-b-0 pr-2 pl-2 text-right text-xs text-nc-content-gray-disabled font-semibold h-13">
+          <div class="w-16 pr-2 pl-2 text-right text-xs text-nc-content-gray-disabled font-semibold h-13">
             {{ timezoneDayjs.dayjsTz(hour).format(is12hrAxis ? 'hh a' : 'HH:00') }}
           </div>
         </div>
       </div>
-      <div class="w-full">
-        <div
-          v-for="(hour, index) in hours"
-          :key="index"
-          :class="{
-            'selected-hour': hour.isSame(selectedTime),
-          }"
-          class="flex w-full border-l-nc-border-gray-light h-13 transition nc-calendar-day-hour relative border-1 group hover:bg-nc-bg-gray-extralight border-nc-base-white border-b-nc-border-gray-light"
-          data-testid="nc-calendar-day-hour"
-          @click="selectHour(hour)"
-          @dblclick="newRecord(hour)"
-        >
-          <NcDropdown
-            v-if="calendarRange.length > 1 && !isPublic"
-            :class="{
-              '!block': hour.isSame(selectedTime),
-              '!hidden': !hour.isSame(selectedTime),
-            }"
-            auto-close
-          >
-            <NcButton
-              class="!group-hover:block mr-10 my-auto ml-auto z-10 top-0 bottom-0 !group-hover:block absolute"
-              size="xsmall"
-              type="secondary"
-            >
-              <component :is="iconMap.plus" class="h-4 w-4" />
-            </NcButton>
-            <template #overlay>
-              <NcMenu class="w-64">
-                <NcMenuItem> Select date field to add </NcMenuItem>
-                <template v-for="(range, calIndex) in calendarRange" :key="calIndex">
-                  <NcMenuItem
-                    v-if="!range.is_readonly"
-                    class="text-nc-content-gray font-semibold text-sm"
-                    @click="newRecordWithRange(range, hour)"
-                  >
-                    <div class="flex items-center gap-1">
-                      <LazySmartsheetHeaderIcon :column="range.fk_from_col" />
 
-                      <span class="ml-1">{{ range.fk_from_col!.title! }}</span>
-                    </div>
-                  </NcMenuItem>
-                </template>
-              </NcMenu>
-            </template>
-          </NcDropdown>
-
+      <!-- Time area: hour-grid background + current-time line + record columns. Grows to fit
+           the columns; the outer wrapper scrolls horizontally when they exceed the viewport. -->
+      <div class="relative flex-1">
+        <!-- Hour grid background (clickable rows + add-record button) -->
+        <div class="absolute inset-0 z-1">
           <div
-            v-else-if="
-              !isPublic && isUIAllowed('dataEdit') && [UITypes.DateTime, UITypes.Date].includes(calDataType) && !isSyncedTable
-            "
-            :class="{
-              '!block': hour.isSame(selectedTime),
-              '!hidden': !hour.isSame(selectedTime),
-            }"
-            class="!group-hover:block mr-10 my-auto ml-auto z-10 top-0 bottom-0 !group-hover:block relative"
+            v-for="(hour, index) in hours"
+            :key="index"
+            :class="{ 'selected-hour': hour.isSame(selectedTime) }"
+            class="flex w-full h-13 transition nc-calendar-day-hour relative border-1 group hover:bg-nc-bg-gray-extralight border-nc-base-white border-b-nc-border-gray-light"
+            data-testid="nc-calendar-day-hour"
+            @click="selectHour(hour)"
+            @dblclick="newRecord(hour)"
           >
-            <PermissionsTooltip
-              :entity="PermissionEntity.TABLE"
-              :entity-id="meta?.id"
-              :permission="PermissionKey.TABLE_RECORD_ADD"
-              placement="left"
+            <NcDropdown
+              v-if="calendarRange.length > 1 && !isPublic"
+              :class="{ '!block': hour.isSame(selectedTime), '!hidden': !hour.isSame(selectedTime) }"
+              auto-close
             >
-              <template #default="{ isAllowed }">
-                <NcButton
-                  size="xsmall"
-                  type="secondary"
-                  :disabled="!isAllowed"
-                  @click="newRecordWithRange(calendarRange[0], hour)"
-                >
-                  <component :is="iconMap.plus" class="h-4 w-4" />
-                </NcButton>
+              <NcButton
+                class="!group-hover:block mr-10 my-auto ml-auto z-10 top-0 bottom-0 !group-hover:block absolute"
+                size="xsmall"
+                type="secondary"
+              >
+                <component :is="iconMap.plus" class="h-4 w-4" />
+              </NcButton>
+              <template #overlay>
+                <NcMenu class="w-64">
+                  <NcMenuItem> Select date field to add </NcMenuItem>
+                  <template v-for="(range, calIndex) in calendarRange" :key="calIndex">
+                    <NcMenuItem
+                      v-if="!range.is_readonly"
+                      class="text-nc-content-gray font-semibold text-sm"
+                      @click="newRecordWithRange(range, hour)"
+                    >
+                      <div class="flex items-center gap-1">
+                        <LazySmartsheetHeaderIcon :column="range.fk_from_col" />
+
+                        <span class="ml-1">{{ range.fk_from_col!.title! }}</span>
+                      </div>
+                    </NcMenuItem>
+                  </template>
+                </NcMenu>
               </template>
-            </PermissionsTooltip>
-          </div>
+            </NcDropdown>
 
-          <NcDropdown v-if="isOverflowAcrossHourRange(hour).isOverflow">
-            <NcButton
-              v-e="`['c:calendar:week-view-more']`"
-              class="!absolute bottom-2 text-center w-15 mx-auto inset-x-0 z-3 text-nc-content-gray-muted"
-              size="xxsmall"
-              type="secondary"
-              @click="viewMore(hour)"
+            <div
+              v-else-if="
+                !isPublic && isUIAllowed('dataEdit') && [UITypes.DateTime, UITypes.Date].includes(calDataType) && !isSyncedTable
+              "
+              :class="{ '!block': hour.isSame(selectedTime), '!hidden': !hour.isSame(selectedTime) }"
+              class="!group-hover:block mr-10 my-auto ml-auto z-10 top-0 bottom-0 !group-hover:block relative"
             >
-              <span class="text-xs">
-                +
-                {{ isOverflowAcrossHourRange(hour).overflowCount }}
-                more
-              </span>
-            </NcButton>
-
-            <template #overlay>
-              <div class="bg-nc-bg-default px-4 gap-3 flex flex-col py-4 max-h-70 overflow-y-auto">
-                <LazySmartsheetCalendarSideRecordCard
-                  v-for="(record, idx) in getOverflowRecords(hour)"
-                  :key="idx"
-                  :draggable="false"
-                  class="w-64"
-                  :invalid="false"
-                  :row="record"
-                  data-testid="nc-sidebar-record-card"
-                  @click="expandRecord(record)"
-                >
-                  <template v-if="!isRowEmpty(record, displayField)">
-                    <LazySmartsheetPlainCell v-model="record.row[displayField!.title!]" :column="displayField" />
-                  </template>
-                  <template v-else-if="fields?.length">
-                    <template v-for="field in fields" :key="field.id">
-                      <LazySmartsheetPlainCell
-                        v-if="!isRowEmpty(record, field!)"
-                        v-model="record.row[field!.title!]"
-                        :column="field"
-                      />
-                    </template>
-                  </template>
-                  <template v-else>
-                    <span class="text-nc-content-gray-muted"> - </span>
-                  </template>
-                  <template #tooltip>
-                    <SmartsheetRecordFieldsTooltip :record="record" :fields="fields" />
-                  </template>
-                </LazySmartsheetCalendarSideRecordCard>
-              </div>
-            </template>
-          </NcDropdown>
+              <PermissionsTooltip
+                :entity="PermissionEntity.TABLE"
+                :entity-id="meta?.id"
+                :permission="PermissionKey.TABLE_RECORD_ADD"
+                placement="left"
+              >
+                <template #default="{ isAllowed }">
+                  <NcButton
+                    size="xsmall"
+                    type="secondary"
+                    :disabled="!isAllowed"
+                    @click="newRecordWithRange(calendarRange[0], hour)"
+                  >
+                    <component :is="iconMap.plus" class="h-4 w-4" />
+                  </NcButton>
+                </template>
+              </PermissionsTooltip>
+            </div>
+          </div>
         </div>
-      </div>
-      <div class="absolute inset-0 pointer-events-none">
-        <div
-          class="relative !ml-[68px] !mr-1 z-2 nc-calendar-day-record-container"
-          data-testid="nc-calendar-day-record-container"
-        >
+
+        <!-- Current-time indicator -->
+        <div v-if="shouldEnableOverlay" class="absolute z-4 inset-x-0 pointer-events-none" :style="{ top: `${overlayTop}px` }">
+          <div class="flex w-full items-center">
+            <span
+              class="text-nc-content-inverted-primary bg-nc-content-brand text-xs font-bold rounded-md pointer-events-auto leading-3.5 p-0.5 cursor-pointer"
+              @click="newRecord(currTime)"
+            >
+              {{ currTime.format(is12hrAxis ? 'hh:mm A' : 'HH:mm') }}
+            </span>
+            <div class="flex-1 relative ml-1 nc-calendar-border-line border-b-2 border-nc-border-brand"></div>
+          </div>
+        </div>
+
+        <!-- Records: each card fills its OWN time-row equally — width = max(100% / N, 48px),
+             where N is this record's overlap count — so a busier row gets thinner cards (and
+             overflows → the outer wrapper scrolls) while a quieter row gets wider cards.
+             The layer is pointer-events-none and inset 8px from the left so clicks between
+             cards (and on the left rail) fall through to the hour grid below — keeping every
+             hour selectable even when a full-width record covers it. -->
+        <div class="absolute z-2 inset-y-0 left-2 right-0 pointer-events-none" data-testid="nc-calendar-day-record-container">
           <template v-for="record in recordsAcrossAllRange.record" :key="record.rowMeta.id">
             <div
               v-if="record.rowMeta.style?.display !== 'none'"
@@ -1211,13 +1026,17 @@ const expandRecord = (record: Row) => {
               :data-unique-id="record.rowMeta.id"
               :style="{
                 ...record.rowMeta.style,
+                width: `max(calc(100% / ${record.rowMeta.numberOfOverlaps || 1}), 48px)`,
+                left: `calc(max(calc(100% / ${record.rowMeta.numberOfOverlaps || 1}), 48px) * ${
+                  (record.rowMeta.overLapIteration || 1) - 1
+                })`,
                 opacity:
                   (dragRecord === null || record.rowMeta.id === dragRecord?.rowMeta.id) &&
                   (resizeRecord === null || record.rowMeta.id === resizeRecord?.rowMeta.id)
                     ? 1
                     : 0.3,
               }"
-              class="absolute draggable-record transition group cursor-pointer pointer-events-auto"
+              class="absolute draggable-record transition group cursor-pointer pointer-events-auto px-0.5"
               @mousedown="dragStart($event, record)"
               @mouseleave="hoverRecord = null"
               @mouseover="hoverRecord = record.rowMeta.id as string"
