@@ -86,6 +86,10 @@ const hours = computed(() => {
 
 const currTime = ref(timezoneDayjs.dayjsTz())
 
+// The hour axis and current-time indicator follow the primary range field's
+// Time format setting (12h vs 24h) rather than being hard-wired to 12h.
+const is12hrAxis = computed(() => is12hrTimeColumn(calendarRange.value?.[0]?.fk_from_col))
+
 const overlayTop = computed(() => {
   const perRecordHeight = 52
 
@@ -897,7 +901,7 @@ const expandRecord = (record: Row) => {
           class="flex h-13 relative border-1 border-nc-base-white border-b-nc-border-gray-light"
         >
           <div class="w-16 pr-2 pl-2 text-right text-xs text-nc-content-gray-disabled font-semibold h-13">
-            {{ timezoneDayjs.dayjsTz(hour).format('hh a') }}
+            {{ timezoneDayjs.dayjsTz(hour).format(is12hrAxis ? 'hh a' : 'HH:00') }}
           </div>
         </div>
       </div>
@@ -983,7 +987,7 @@ const expandRecord = (record: Row) => {
               class="text-nc-content-inverted-primary bg-nc-content-brand text-xs font-bold rounded-md pointer-events-auto leading-3.5 p-0.5 cursor-pointer"
               @click="newRecord(currTime)"
             >
-              {{ currTime.format('hh:mm A') }}
+              {{ currTime.format(is12hrAxis ? 'hh:mm A' : 'HH:mm') }}
             </span>
             <div class="flex-1 relative ml-1 nc-calendar-border-line border-b-2 border-nc-border-brand"></div>
           </div>
@@ -1041,7 +1045,11 @@ const expandRecord = (record: Row) => {
                 </template>
                 <template #time>
                   <div class="text-xs font-medium text-nc-content-gray-disabled">
-                    {{ timezoneDayjs.timezonize(record.row[record.rowMeta.range?.fk_from_col!.title!]).format('h:mm a') }}
+                    {{
+                      timezoneDayjs
+                        .timezonize(record.row[record.rowMeta.range?.fk_from_col!.title!])
+                        .format(is12hrTimeColumn(record.rowMeta.range?.fk_from_col) ? 'h:mm a' : 'HH:mm')
+                    }}
                   </div>
                 </template>
               </LazySmartsheetCalendarVRecordCard>
