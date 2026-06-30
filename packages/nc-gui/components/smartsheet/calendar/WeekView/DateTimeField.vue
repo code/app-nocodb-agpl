@@ -14,8 +14,6 @@ const {
   viewMetaProperties,
   selectedTime,
   updateRowProperty,
-  sideBarFilterOption,
-  showSideMenu,
   updateFormat,
   timezoneDayjs,
   isSyncedFromColumn,
@@ -302,13 +300,17 @@ const getMaxOverlaps = ({
 
   const dayIndex = row.rowMeta.dayIndex
   const overlapIndex = columnArray[dayIndex].findIndex((column) => column.findIndex((r) => r.rowMeta.id === id) !== -1) + 1
+  // Walk the whole connected overlap component to fully populate `visited`; maxOverlaps below
+  // is then the component's column count (max overLapIteration). Every record in the cluster
+  // must resolve to the SAME denominator, so we must NOT early-exit the traversal — doing so
+  // (the old `>= columnArray.length` short-circuit) left `visited` partial, giving co-overlapping
+  // cards different width/left grids and overlapping them. (Mirrors DayView's union-find cluster.)
   const dfs = (id: string): number => {
     visited.add(id)
     let maxOverlaps = 1
     const neighbors = graph.get(id)
     if (neighbors) {
       for (const neighbor of neighbors) {
-        if (maxOverlaps >= columnArray[dayIndex].length) return maxOverlaps
         if (!visited.has(neighbor)) {
           maxOverlaps = Math.min(Math.max(maxOverlaps, dfs(neighbor) + 1), columnArray[dayIndex].length)
         }
@@ -359,7 +361,6 @@ const recordsAcrossAllRange = computed<{
       {
         count: number
         id: string[]
-        overflowRecords: Row[]
       }
     >
   >
@@ -390,7 +391,6 @@ const recordsAcrossAllRange = computed<{
       {
         count: number
         id: string[]
-        overflowRecords: Row[]
       }
     >
   >()
@@ -549,17 +549,13 @@ const recordsAcrossAllRange = computed<{
               {
                 count: number
                 id: string[]
-                overflowRecords: Row[]
               }
             >(),
           )
         }
 
         if (!gridTimeMap.get(dayIndex)?.has(gridCounter)) {
-          gridTimeMap.set(
-            dayIndex,
-            (gridTimeMap.get(dayIndex) ?? new Map()).set(gridCounter, { count: 0, id: [], overflowRecords: [] }),
-          )
+          gridTimeMap.set(dayIndex, (gridTimeMap.get(dayIndex) ?? new Map()).set(gridCounter, { count: 0, id: [] }))
         }
 
         const idArray = gridTimeMap.get(dayIndex)!.get(gridCounter)!.id
@@ -571,7 +567,6 @@ const recordsAcrossAllRange = computed<{
           (gridTimeMap.get(dayIndex) ?? new Map()).set(gridCounter, {
             count,
             id: idArray,
-            overflowRecords: gridTimeMap.get(dayIndex)!.get(gridCounter)!.overflowRecords,
           }),
         )
       }
@@ -1029,12 +1024,6 @@ const dropEvent = (event: DragEvent) => {
   }
 }
 
-const viewMore = (hour: dayjs.Dayjs) => {
-  sideBarFilterOption.value = 'selectedHours'
-  selectedTime.value = hour
-  showSideMenu.value = true
-}
-
 // A cluster ("band") gets the Airtable-style "view all in day view" overlay (over just that
 // cluster — readable cards elsewhere in the day stay clear) when its cards look empty/too
 // small to read: either too THIN (busiest overlap shrinks card width below a readable px)
@@ -1043,7 +1032,9 @@ const WEEK_READABLE_CARD_WIDTH = 36
 const WEEK_READABLE_CARD_HEIGHT = 36
 const isDenseBand = (band: { dayIndex: number; maxOverlaps: number; maxHeight: number }) => {
   const tooThin = band.maxOverlaps >= 2 && (columnWidthPx(band.dayIndex) - 3) / band.maxOverlaps < WEEK_READABLE_CARD_WIDTH
-  const tooShort = band.maxHeight > 0 && band.maxHeight < WEEK_READABLE_CARD_HEIGHT
+  // A lone card (maxOverlaps < 2) is never "dense" — only flag too-short when records actually
+  // overlap, so a single short event stays readable/interactive instead of being covered by the overlay.
+  const tooShort = band.maxOverlaps >= 2 && band.maxHeight > 0 && band.maxHeight < WEEK_READABLE_CARD_HEIGHT
   return tooThin || tooShort
 }
 
@@ -1066,36 +1057,6 @@ const openDayView = (date: dayjs.Dayjs) => {
 const openDayViewForColumn = (dayIndex: number) => {
   const date = datesHours.value[dayIndex]?.[0]
   if (date) openDayView(date)
-}
-
-const isOverflowAcrossHourRange = (hour: dayjs.Dayjs) => {
-  if (!recordsAcrossAllRange.value || !recordsAcrossAllRange.value.gridTimeMap)
-    return {
-      isOverflow: false,
-      overflowCount: 0,
-      overflowRecords: [],
-    }
-  const { gridTimeMap } = recordsAcrossAllRange.value
-  const dayIndex = getDayIndex(hour)
-
-  const startMinute = hour.hour() * 60 + hour.minute()
-  const endMinute = hour.hour() * 60 + hour.minute() + 59
-  const dayMap = gridTimeMap.get(dayIndex)
-
-  const uniqueRecords: Row[] = []
-  const uniqueRecordIds = new Set<string>()
-
-  for (let minute = startMinute; minute <= endMinute; minute++) {
-    const records = dayMap?.get(minute)?.overflowRecords ?? []
-    for (const rec of records) {
-      if (!uniqueRecordIds.has(rec.rowMeta?.id)) {
-        uniqueRecords.push(rec)
-        uniqueRecordIds.add(rec.rowMeta?.id)
-      }
-    }
-  }
-
-  return { isOverflow: uniqueRecords?.length, overflowCount: uniqueRecords?.length, overflowRecords: uniqueRecords }
 }
 
 // TODO: Add Support for multiple ranges when multiple ranges are supported
@@ -1244,56 +1205,7 @@ watch(
               dragRecord = null
             }
           "
-        >
-          <NcDropdown v-if="isOverflowAcrossHourRange(hour).isOverflow" :trigger="['click']">
-            <NcButton
-              v-e="`['c:calendar:week-view-more']`"
-              class="!absolute bottom-1 text-center w-15 ml-auto inset-x-0 z-3 text-nc-content-gray-muted"
-              size="xxsmall"
-              type="secondary"
-              @click="viewMore(hour)"
-            >
-              <span class="text-xs">
-                +
-                {{ isOverflowAcrossHourRange(hour).overflowCount }}
-                more
-              </span>
-            </NcButton>
-            <template #overlay>
-              <div class="bg-nc-bg-default px-4 gap-3 flex flex-col py-4 max-h-70 overflow-y-auto">
-                <LazySmartsheetCalendarSideRecordCard
-                  v-for="record in isOverflowAcrossHourRange(hour).overflowRecords"
-                  :key="record?.rowMeta?.id"
-                  :draggable="false"
-                  class="w-64"
-                  :invalid="false"
-                  :row="record"
-                  data-testid="nc-sidebar-record-card"
-                  @click="expandRecord(record)"
-                >
-                  <template v-if="!isRowEmpty(record, displayField)">
-                    <LazySmartsheetPlainCell v-model="record.row[displayField!.title!]" :column="displayField" />
-                  </template>
-                  <template v-else-if="fields?.length">
-                    <template v-for="field in fields" :key="field.id">
-                      <LazySmartsheetPlainCell
-                        v-if="!isRowEmpty(record, field!)"
-                        v-model="record.row[field!.title!]"
-                        :column="field"
-                      />
-                    </template>
-                  </template>
-                  <template v-else>
-                    <span class="text-nc-content-gray-muted"> - </span>
-                  </template>
-                  <template #tooltip>
-                    <SmartsheetRecordFieldsTooltip :record="record" :fields="fields" />
-                  </template>
-                </LazySmartsheetCalendarSideRecordCard>
-              </div>
-            </template>
-          </NcDropdown>
-        </div>
+        ></div>
       </div>
 
       <div

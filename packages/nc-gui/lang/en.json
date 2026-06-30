@@ -3398,7 +3398,7 @@
     "goBackHome": "Go back home"
   },
   "tooltip": {
-    "viewAllEventsInDayView": "View all {count} events in day view",
+    "viewAllEventsInDayView": "View all {count} event in day view | View all {count} events in day view",
     "linkValueDelimiter": "Character separating multiple linked values within a single cell (default ,)",
     "shiftClickWeekStep": "Hold Shift to step by 1 week",
     "milestone": "Milestone",
