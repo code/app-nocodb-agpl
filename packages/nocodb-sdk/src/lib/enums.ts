@@ -713,12 +713,25 @@ export enum HookOperationCode {
   update = 1 << 1, // 2
   delete = 1 << 2, // 4
   trigger = 1 << 3, // 8
+  // Comment-source operations (event = 'comment'). Distinct bits so a single
+  // bitmask can encode any subset, mirroring the record operations above.
+  added = 1 << 4, // 16
+  edited = 1 << 5, // 32
+  deleted = 1 << 6, // 64
+  resolved = 1 << 7, // 128
+  reopened = 1 << 8, // 256
 }
 
 export enum WebhookActions {
   INSERT = 'insert',
   UPDATE = 'update',
   DELETE = 'delete',
+  // Comment-source actions
+  ADDED = 'added',
+  EDITED = 'edited',
+  DELETED = 'deleted',
+  RESOLVED = 'resolved',
+  REOPENED = 'reopened',
 }
 
 export enum WebhookEvents {
@@ -727,6 +740,7 @@ export enum WebhookEvents {
   MANUAL = 'manual',
   VIEW = 'view',
   FIELD = 'field',
+  COMMENT = 'comment',
 }
 
 export enum ViewSettingOverrideOptions {
