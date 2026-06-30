@@ -15474,7 +15474,7 @@
             "type": "string",
             "description": "Comment text (supports markdown).",
             "example": "This is a comment",
-            "maxLength": 3000
+            "maxLength": 10000
           },
           "created_by": {
             "type": "string",
@@ -15519,7 +15519,7 @@
             "type": "string",
             "description": "Comment text (supports markdown).",
             "example": "This is a comment",
-            "maxLength": 3000
+            "maxLength": 10000
           }
         },
         "required": [
@@ -15534,7 +15534,7 @@
             "type": "string",
             "description": "Updated comment text.",
             "example": "Updated comment",
-            "maxLength": 3000
+            "maxLength": 10000
           }
         },
         "required": [
