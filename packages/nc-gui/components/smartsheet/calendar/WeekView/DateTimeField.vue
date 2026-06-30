@@ -1035,6 +1035,15 @@ const isDenseBand = (band: { dayIndex: number; maxOverlaps: number; maxHeight: n
   return tooThin || tooShort
 }
 
+// Below the readable width a sliver can't fit even a single letter or an ellipsis, so
+// (Airtable-style) we render it as a blank colored block and skip the title/time
+// entirely — these cards sit under the dense-cluster overlay, which reveals
+// "view all events in day view" on hover.
+const isCardTooThinToRender = (record: Row) => {
+  const width = Number.parseFloat(`${record.rowMeta?.style?.width ?? ''}`)
+  return !Number.isNaN(width) && width < WEEK_READABLE_CARD_WIDTH
+}
+
 // Clicking a dense-cluster overlay opens that day in the (readable) day view.
 const openDayView = (date: dayjs.Dayjs) => {
   selectedDate.value = date
@@ -1310,22 +1319,24 @@ watch(
                 :clamp-lines="cardClampLines(record)"
                 @resize-start="onResizeStart"
               >
-                <template v-for="(field, id) in fields" :key="id">
-                  <LazySmartsheetPlainCell
-                    v-if="!isRowEmpty(record, field!)"
-                    v-model="record.row[field!.title!]"
-                    class="text-xs"
-                    :column="field"
-                    :bold="!!fieldStyles[field.id]?.bold"
-                    :italic="!!fieldStyles[field.id]?.italic"
-                    :underline="!!fieldStyles[field.id]?.underline"
-                  />
+                <template v-if="!isCardTooThinToRender(record)">
+                  <template v-for="(field, id) in fields" :key="id">
+                    <LazySmartsheetPlainCell
+                      v-if="!isRowEmpty(record, field!)"
+                      v-model="record.row[field!.title!]"
+                      class="text-xs"
+                      :column="field"
+                      :bold="!!fieldStyles[field.id]?.bold"
+                      :italic="!!fieldStyles[field.id]?.italic"
+                      :underline="!!fieldStyles[field.id]?.underline"
+                    />
+                  </template>
                 </template>
                 <template #tooltip>
                   <SmartsheetRecordFieldsTooltip :record="record" :fields="fields" />
                 </template>
                 <template #time>
-                  <div class="text-xs font-medium text-nc-content-gray-disabled">
+                  <div v-if="!isCardTooThinToRender(record)" class="text-xs font-medium text-nc-content-gray-disabled">
                     {{
                       timezoneDayjs
                         .timezonize(record.row[record.rowMeta.range?.fk_from_col!.title!])
