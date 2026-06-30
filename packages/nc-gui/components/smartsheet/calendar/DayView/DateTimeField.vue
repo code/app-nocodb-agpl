@@ -220,8 +220,6 @@ const hoverRecord = ref<string | null>(null)
 
 const recordsAcrossAllRange = computed<{
   record: Row[]
-  columns: Row[][]
-  maxColumns: number
   spanningRecords: Row[]
   gridTimeMap: Map<
     number,
@@ -232,8 +230,7 @@ const recordsAcrossAllRange = computed<{
     }
   >
 }>(() => {
-  if (!calendarRange.value || !formattedData.value)
-    return { record: [], columns: [], maxColumns: 1, spanningRecords: [], gridTimeMap: new Map() }
+  if (!calendarRange.value || !formattedData.value) return { record: [], spanningRecords: [], gridTimeMap: new Map() }
 
   const scheduleStart = timezoneDayjs.dayjsTz(selectedDate.value).startOf('day')
   const scheduleEnd = timezoneDayjs.dayjsTz(selectedDate.value).endOf('day')
@@ -425,18 +422,32 @@ const recordsAcrossAllRange = computed<{
     }
   }
 
-  const maxColumns = Math.max(columnArray.length, 1)
-
-  // Group records into their packed columns. The template renders `maxColumns`
-  // equal-width flex-1 columns inside a free-growing inner wrapper; CSS lays them out —
-  // they stretch equally to fill when few, and hold a min-width (overflowing → the outer
-  // wrapper scrolls) when many. No JS width measurement, so there is no ResizeObserver
-  // feedback loop, and no record is ever hidden behind "+N more".
-  const columns: Row[][] = Array.from({ length: maxColumns }, () => [])
-
+  // Per-record overlap count: the most records concurrent at any point during this
+  // record's span. The template sizes each card as `max(100% / N, MIN)`, so cards in a
+  // single time-row are equal width (flex-1-like) and fill the visible width when few
+  // overlap, but hold a readable min-width — overflowing, so the outer wrapper scrolls —
+  // when many. A row with fewer records therefore gets wider cards than a busier row.
   for (const record of recordsByRange) {
-    const colIndex = (record.rowMeta.overLapIteration ?? 1) - 1
-    if (columns[colIndex]) columns[colIndex].push(record)
+    const fromCol = record.rowMeta.range?.fk_from_col
+    const toCol = record.rowMeta.range?.fk_to_col
+    if (!fromCol) continue
+
+    const { startDate, endDate } = calculateNewDates({
+      startDate: timezoneDayjs.timezonize(record.row[fromCol.title!]),
+      endDate:
+        toCol && dayjs(record.row[toCol.title])?.isValid()
+          ? timezoneDayjs.timezonize(record.row[toCol.title!])
+          : timezoneDayjs.timezonize(record.row[fromCol.title!]).add(1, 'hour').subtract(1, 'minute'),
+      scheduleStart,
+      scheduleEnd,
+    })
+    const gridTimes = getGridTimeSlots(startDate, endDate)
+
+    let overlaps = 1
+    for (let slot = gridTimes.from; slot <= gridTimes.to; slot++) {
+      overlaps = Math.max(overlaps, gridTimeMap.get(slot)?.count ?? 1)
+    }
+    record.rowMeta.numberOfOverlaps = overlaps
 
     record.rowMeta.style = {
       ...record.rowMeta.style,
@@ -447,8 +458,6 @@ const recordsAcrossAllRange = computed<{
   return {
     gridTimeMap,
     record: recordsByRange,
-    columns,
-    maxColumns,
     spanningRecords: recordSpanningDays,
   }
 })
@@ -879,7 +888,7 @@ const expandRecord = (record: Row) => {
     <!-- Inner wrapper: free size — grows to fit the flex-1 columns. The OUTER wrapper (above)
          has the scrollbar; this never does. Records are laid out by CSS flex (no JS width
          measurement → no ResizeObserver loop) and nothing is hidden behind "+N more". -->
-    <div ref="container" class="flex relative no-selection w-max min-w-full" data-testid="nc-calendar-day-view" @drop="dropEvent">
+    <div ref="container" class="flex relative no-selection w-full" data-testid="nc-calendar-day-view" @drop="dropEvent">
       <!-- Time-axis gutter: sticky so it stays put while the grid scrolls horizontally -->
       <div class="sticky left-0 z-20 bg-nc-bg-default flex-none">
         <div
@@ -895,7 +904,7 @@ const expandRecord = (record: Row) => {
 
       <!-- Time area: hour-grid background + current-time line + record columns. Grows to fit
            the columns; the outer wrapper scrolls horizontally when they exceed the viewport. -->
-      <div class="relative flex flex-1">
+      <div class="relative flex-1">
         <!-- Hour grid background (clickable rows + add-record button) -->
         <div class="absolute inset-0 z-1">
           <div
@@ -980,67 +989,65 @@ const expandRecord = (record: Row) => {
           </div>
         </div>
 
-        <!-- Record columns: equal-width flex-1 columns. They stretch to fill when few overlap,
-             and hold a min-width (overflowing → outer scrolls) when many. -->
-        <div
-          v-for="col in recordsAcrossAllRange.maxColumns"
-          :key="col"
-          class="relative z-2 flex-[1_0_48px] pointer-events-none"
-          data-testid="nc-calendar-day-column"
-        >
-          <template v-for="record in recordsAcrossAllRange.columns[col - 1]" :key="record.rowMeta.id">
-            <div
-              v-if="record.rowMeta.style?.display !== 'none'"
-              :data-testid="`nc-calendar-day-record-${record.row[displayField!.title!]}`"
-              :data-unique-id="record.rowMeta.id"
-              :style="{
-                ...record.rowMeta.style,
-                opacity:
-                  (dragRecord === null || record.rowMeta.id === dragRecord?.rowMeta.id) &&
-                  (resizeRecord === null || record.rowMeta.id === resizeRecord?.rowMeta.id)
-                    ? 1
-                    : 0.3,
-              }"
-              class="absolute inset-x-0.5 draggable-record transition group cursor-pointer pointer-events-auto"
-              @mousedown="dragStart($event, record)"
-              @mouseleave="hoverRecord = null"
-              @mouseover="hoverRecord = record.rowMeta.id as string"
-              @dragover.prevent
-            >
-              <LazySmartsheetRow :row="record">
-                <LazySmartsheetCalendarVRecordCard
-                  :hover="hoverRecord === record.rowMeta.id"
-                  :selected="record.rowMeta.id === dragRecord?.rowMeta?.id"
-                  :record="record"
-                  :dragging="record.rowMeta.id === dragRecord?.rowMeta?.id || record.rowMeta.id === resizeRecord?.rowMeta?.id"
-                  :resize="!!record.rowMeta.range?.fk_to_col && isUIAllowed('dataEdit')"
-                  :clamp-lines="cardClampLines(record)"
-                  @resize-start="onResizeStart"
-                >
-                  <template v-for="(field, id) in fields" :key="id">
-                    <LazySmartsheetPlainCell
-                      v-if="!isRowEmpty(record, field!)"
-                      v-model="record.row[field!.title!]"
-                      class="text-xs font-medium"
-                      :bold="getFieldStyle(field).bold"
-                      :column="field"
-                      :italic="getFieldStyle(field).italic"
-                      :underline="getFieldStyle(field).underline"
-                    />
-                  </template>
-                  <template #tooltip>
-                    <SmartsheetRecordFieldsTooltip :record="record" :fields="fields" />
-                  </template>
-                  <template #time>
-                    <div class="text-xs font-medium text-nc-content-gray-disabled">
-                      {{ timezoneDayjs.timezonize(record.row[record.rowMeta.range?.fk_from_col!.title!]).format('h:mm a') }}
-                    </div>
-                  </template>
-                </LazySmartsheetCalendarVRecordCard>
-              </LazySmartsheetRow>
-            </div>
-          </template>
-        </div>
+        <!-- Records: each card fills its OWN time-row equally — width = max(100% / N, 48px),
+             where N is this record's overlap count — so a busier row gets thinner cards (and
+             overflows → the outer wrapper scrolls) while a quieter row gets wider cards. -->
+        <template v-for="record in recordsAcrossAllRange.record" :key="record.rowMeta.id">
+          <div
+            v-if="record.rowMeta.style?.display !== 'none'"
+            :data-testid="`nc-calendar-day-record-${record.row[displayField!.title!]}`"
+            :data-unique-id="record.rowMeta.id"
+            :style="{
+              ...record.rowMeta.style,
+              width: `max(calc(100% / ${record.rowMeta.numberOfOverlaps || 1}), 48px)`,
+              left: `calc(max(calc(100% / ${record.rowMeta.numberOfOverlaps || 1}), 48px) * ${
+                (record.rowMeta.overLapIteration || 1) - 1
+              })`,
+              opacity:
+                (dragRecord === null || record.rowMeta.id === dragRecord?.rowMeta.id) &&
+                (resizeRecord === null || record.rowMeta.id === resizeRecord?.rowMeta.id)
+                  ? 1
+                  : 0.3,
+            }"
+            class="absolute z-2 draggable-record transition group cursor-pointer pointer-events-auto px-0.5"
+            @mousedown="dragStart($event, record)"
+            @mouseleave="hoverRecord = null"
+            @mouseover="hoverRecord = record.rowMeta.id as string"
+            @dragover.prevent
+          >
+            <LazySmartsheetRow :row="record">
+              <LazySmartsheetCalendarVRecordCard
+                :hover="hoverRecord === record.rowMeta.id"
+                :selected="record.rowMeta.id === dragRecord?.rowMeta?.id"
+                :record="record"
+                :dragging="record.rowMeta.id === dragRecord?.rowMeta?.id || record.rowMeta.id === resizeRecord?.rowMeta?.id"
+                :resize="!!record.rowMeta.range?.fk_to_col && isUIAllowed('dataEdit')"
+                :clamp-lines="cardClampLines(record)"
+                @resize-start="onResizeStart"
+              >
+                <template v-for="(field, id) in fields" :key="id">
+                  <LazySmartsheetPlainCell
+                    v-if="!isRowEmpty(record, field!)"
+                    v-model="record.row[field!.title!]"
+                    class="text-xs font-medium"
+                    :bold="getFieldStyle(field).bold"
+                    :column="field"
+                    :italic="getFieldStyle(field).italic"
+                    :underline="getFieldStyle(field).underline"
+                  />
+                </template>
+                <template #tooltip>
+                  <SmartsheetRecordFieldsTooltip :record="record" :fields="fields" />
+                </template>
+                <template #time>
+                  <div class="text-xs font-medium text-nc-content-gray-disabled">
+                    {{ timezoneDayjs.timezonize(record.row[record.rowMeta.range?.fk_from_col!.title!]).format('h:mm a') }}
+                  </div>
+                </template>
+              </LazySmartsheetCalendarVRecordCard>
+            </LazySmartsheetRow>
+          </div>
+        </template>
       </div>
     </div>
   </div>
