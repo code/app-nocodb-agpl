@@ -649,58 +649,13 @@ const recordsAcrossAllRange = computed<{
         record.rowMeta.id === dragRecord.value?.rowMeta.id || record.rowMeta.id === resizeRecord.value?.rowMeta.id
 
       if (!isRecordDraggingOrResizeState) {
-        if (record.rowMeta.overLapIteration! > 3) {
-          display = 'none'
-          // Add overflowing record to gridTimeMap
-          const fromCol = record.rowMeta.range?.fk_from_col
-          const toCol = record.rowMeta.range?.fk_to_col
-
-          if (fromCol) {
-            const { startDate, endDate } = calculateNewDates({
-              startDate: timezoneDayjs.timezonize(record.row[fromCol.title!]),
-              endDate:
-                toCol && dayjs(record.row[toCol.title!])?.isValid()
-                  ? timezoneDayjs.timezonize(record.row[toCol.title!])
-                  : timezoneDayjs.timezonize(record.row[fromCol.title!]).add(1, 'hour').subtract(1, 'minute'),
-              scheduleStart,
-              scheduleEnd,
-            })
-
-            const gridTimes = getGridTimeSlots(startDate, endDate)
-
-            // Attribute the overflow record to only the slot it starts in, so a
-            // record spanning multiple hours surfaces a single "+N more" badge at
-            // its start hour instead of one badge per spanned hour row.
-            const startSlot = gridTimes.from
-            if (gridTimeMap.has(dayIndex) && gridTimeMap.get(dayIndex)?.has(startSlot)) {
-              const currentSlot = gridTimeMap.get(dayIndex)!.get(startSlot)!
-              if (!currentSlot.overflowRecords.some((r) => r.rowMeta.id === record.rowMeta.id)) {
-                currentSlot.overflowRecords.push(record)
-                gridTimeMap.get(dayIndex)!.set(startSlot, currentSlot)
-              }
-            }
-          }
-        } else {
-          // Calculate the available width for each day
-          const availableWidth = dayWidth - 3 // Account for padding/margins
-
-          // Calculate the width of each record based on the number of overlaps (up to 3)
-          // Ensure minimum width of 72px
-          width = Math.max(availableWidth / Math.min(maxOverlaps, 3), 72)
-
-          // Calculate the spacing between records
-          const spacing = (availableWidth - width * Math.min(maxOverlaps, 3)) / Math.max(Math.min(maxOverlaps, 3) - 1, 1)
-
-          // Calculate the left position based on the day index and overlap index
-          // This ensures uniform distribution of records within the day container
-          left = majorLeft + 1.5 + (overlapIndex - 1) * (width + spacing)
-
-          // Safety check to ensure the record stays within its day container
-          if (left + width > majorLeft + dayWidth) {
-            // Adjust the width if needed to fit within the container
-            width = Math.max(majorLeft + dayWidth - left - 1.5, 72)
-          }
-        }
+        // Shrink every overlapping record to fit its day column (Airtable-style slivers) —
+        // no 3-column cap, no min-width floor, no "+N more", so nothing is hidden. Records in
+        // the same overlap cluster are equal width; clusters with fewer records get wider
+        // cards. A narrow sliver expands to a readable width on hover (see the template).
+        const availableWidth = dayWidth - 3
+        width = availableWidth / maxOverlaps
+        left = majorLeft + 1.5 + (overlapIndex - 1) * width
       } else {
         left = majorLeft + 1.5
         width = dayWidth - 3
@@ -710,7 +665,6 @@ const recordsAcrossAllRange = computed<{
         ...record.rowMeta.style,
         left: `${left}px`,
         width: `${width}px`,
-        minWidth: '72px',
         display,
       }
     }
@@ -1021,6 +975,20 @@ const viewMore = (hour: dayjs.Dayjs) => {
   showSideMenu.value = true
 }
 
+// Number of records shown on a given day column (by visible day index). Used to label
+// the day header's "view all in day view" affordance.
+const dayRecordCount = (dayIndex: number) => {
+  return recordsAcrossAllRange.value.records.filter((r) => (r.rowMeta.dayIndex ?? -1) === dayIndex).length
+}
+
+// On a busy week day cards shrink to slivers; clicking the day header opens that day in
+// the (readable) day view instead.
+const openDayView = (date: dayjs.Dayjs) => {
+  selectedDate.value = date
+  activeCalendarView.value = 'day'
+  $e('c:calendar:week-day-header:open-day-view')
+}
+
 const isOverflowAcrossHourRange = (hour: dayjs.Dayjs) => {
   if (!recordsAcrossAllRange.value || !recordsAcrossAllRange.value.gridTimeMap)
     return {
@@ -1123,17 +1091,33 @@ watch(
       </div>
     </div>
     <div class="flex sticky h-6 z-4 top-0 pl-16 bg-nc-bg-gray-extralight w-full">
-      <div
+      <NcTooltip
         v-for="(date, index) in datesHours"
         :key="date[0].toISOString()"
-        :class="{
-          'text-nc-content-brand': date[0].isSame(timezoneDayjs.dayjsTz(), 'date'),
-        }"
         :style="{ width: columnWidthPct(index) }"
-        class="text-center text-[10px] font-semibold leading-4 flex items-center justify-center uppercase text-nc-content-gray-muted py-1 border-nc-border-gray-medium last:border-r-0 border-b-1 border-l-1 border-r-0 bg-nc-bg-gray-extralight"
+        :disabled="!dayRecordCount(index)"
+        class="border-nc-border-gray-medium last:border-r-0 border-b-1 border-l-1 border-r-0 bg-nc-bg-gray-extralight"
       >
-        {{ timezoneDayjs.dayjsTz(date[0]).format('DD ddd') }}
-      </div>
+        <template #title>
+          {{ $t('tooltip.viewAllEventsInDayView', { count: dayRecordCount(index) }) }}
+        </template>
+        <div
+          :class="{
+            'text-nc-content-brand': date[0].isSame(timezoneDayjs.dayjsTz(), 'date'),
+          }"
+          class="h-full text-center text-[10px] font-semibold leading-4 flex items-center justify-center gap-1 uppercase text-nc-content-gray-muted py-1 cursor-pointer hover:bg-nc-bg-gray-light transition-colors"
+          data-testid="nc-calendar-week-day-header"
+          @click="openDayView(date[0])"
+        >
+          {{ timezoneDayjs.dayjsTz(date[0]).format('DD ddd') }}
+          <span
+            v-if="dayRecordCount(index) > 3"
+            class="normal-case px-1 leading-3.5 rounded bg-nc-bg-gray-medium text-nc-content-gray-subtle"
+          >
+            {{ dayRecordCount(index) }}
+          </span>
+        </div>
+      </NcTooltip>
     </div>
     <div
       :class="{
