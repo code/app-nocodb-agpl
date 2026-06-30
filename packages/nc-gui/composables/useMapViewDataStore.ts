@@ -118,6 +118,12 @@ const [useProvideMapViewStore, useMapViewStore] = useInjectionState(
       const row = currentRow.row
       if (currentRow.rowMeta) currentRow.rowMeta.saving = true
       try {
+        // Table meta can be transiently undefined (e.g. cleared during navigation/teardown
+        // while a deferred save fires) — bail gracefully instead of firing a doomed create.
+        if (!(metaValue as TableType)?.columns) {
+          return
+        }
+
         const { missingRequiredColumns, insertObj } = await populateInsertObject({
           meta: metaValue as TableType,
           ltarState,
