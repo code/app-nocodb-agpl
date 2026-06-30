@@ -128,9 +128,13 @@ const columns = computed(() =>
 
 const reloadHook = inject(ReloadViewDataHookInj, createEventHook())
 
+const reloadMetaHook = inject(ReloadViewMetaHookInj, createEventHook())
+
 const useForm = Form.useForm
 
 const { $api, $poller } = useNuxtApp()
+
+const { getMeta } = useMetas()
 
 const basesStore = useBases()
 
@@ -846,6 +850,17 @@ async function importViaJob() {
     }
 
     if (importDataOnly) {
+      // A data-only import can now create new fields on the target table. Those
+      // are added by the backend job, so the open view's meta is stale — force a
+      // meta refresh (and notify view listeners) so the new columns appear
+      // without a manual page reload. Only when a create-field mapping ran.
+      const createdNewField = Object.values(srcDestMapping.value).some((rows) =>
+        (rows as Record<string, any>[]).some((r) => r.enabled && r.createColumn),
+      )
+      if (createdNewField && meta.value?.base_id && meta.value?.id) {
+        await getMeta(meta.value.base_id, meta.value.id, true)
+        reloadMetaHook.trigger()
+      }
       reloadHook.trigger()
       surfaceImportResult(importFinalStats)
     } else {
@@ -1203,11 +1218,11 @@ function getErrorByTableName(tableName: string) {
                   <div class="w-full flex items-center gap-2">
                     <div
                       v-if="record.createColumn"
-                      class="nc-import-new-field flex-1 min-w-0 flex items-center gap-2 pl-2 pr-1 h-7 rounded-lg"
+                      class="nc-import-new-field flex-1 min-w-0 flex items-center gap-2 pl-3 pr-1 h-7 rounded-lg text-nc-content-brand"
                       data-testid="nc-import-new-field"
                     >
-                      <GeneralIcon icon="ncPlus" class="flex-none w-3.5 h-3.5 text-nc-content-brand" />
-                      <NcTooltip class="truncate flex-1 text-nc-content-gray text-sm font-weight-500" show-on-truncate-only>
+                      <GeneralIcon icon="ncPlus" class="flex-none w-4 h-4" />
+                      <NcTooltip class="truncate flex-1 text-sm font-weight-500" show-on-truncate-only>
                         <template #title>{{ record.destCn }}</template>
                         {{ record.destCn }}
                       </NcTooltip>
@@ -1217,12 +1232,14 @@ function getErrorByTableName(tableName: string) {
                       <NcButton
                         type="text"
                         size="xsmall"
-                        class="flex-none !h-5 !w-5"
+                        class="nc-import-new-field-clear flex-none !min-w-5 !h-5 !w-5"
                         icon-only
                         data-testid="nc-import-new-field-clear"
                         @click="clearCreateColumn(record)"
                       >
-                        <GeneralIcon icon="close" class="w-3.5 h-3.5 text-nc-content-gray-muted" />
+                        <template #icon>
+                          <GeneralIcon icon="close" class="w-3.5 h-3.5 text-nc-content-gray-muted" />
+                        </template>
                       </NcButton>
                     </div>
                     <a-form-item v-else class="!my-0 flex-1 min-w-0">
