@@ -60,6 +60,19 @@ export const SCHEMA_CALENDAR: SyncSchema = {
       { title: 'Creator', uidt: UITypes.Email },
       { title: 'Organizer', uidt: UITypes.Email },
       { title: 'Attendees', uidt: UITypes.SingleLineText },
+      { title: 'Attendee Count', uidt: UITypes.Number },
+      {
+        title: 'My Response',
+        uidt: UITypes.SingleSelect,
+        colOptions: {
+          options: [
+            { title: 'needsAction' },
+            { title: 'accepted' },
+            { title: 'declined' },
+            { title: 'tentative' },
+          ],
+        },
+      },
       { title: 'Attachments', uidt: UITypes.LongText },
       { title: 'Created', uidt: UITypes.DateTime },
       { title: 'Updated', uidt: UITypes.DateTime },
