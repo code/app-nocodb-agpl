@@ -79,7 +79,7 @@ export const SCHEMA_CALENDAR: SyncSchema = {
       { title: 'Event ID', uidt: UITypes.SingleLineText },
       { title: 'iCalUID', uidt: UITypes.SingleLineText },
       { title: 'Event Link', uidt: UITypes.URL },
-      { title: 'Hangouts Link', uidt: UITypes.URL },
+      { title: 'Meeting Link', uidt: UITypes.URL },
       { title: 'Meeting Provider', uidt: UITypes.SingleLineText },
       { title: 'Color', uidt: UITypes.SingleLineText },
     ],
