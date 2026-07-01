@@ -714,28 +714,30 @@ const stopDrag = (event: MouseEvent) => {
 }
 
 const dragStart = (event: MouseEvent, record: Row) => {
-  if (isSyncedFromColumn.value) return
-
   let target = event.target as HTMLElement
 
   isDragging.value = false
 
-  // We use a timeout to determine if the user is dragging or clicking on the record
-  dragTimeout.value = setTimeout(() => {
-    if (!isUIAllowed('dataEdit')) return
-    if (record.rowMeta.range?.is_readonly) return
+  // Drag-to-reschedule is gated to editable, non-synced ranges; click-to-expand
+  // (onMouseUp below) must work regardless so synced records can be opened.
+  const canDrag =
+    isUIAllowed('dataEdit') && !isSyncedFromColumn.value && !record.rowMeta.range?.is_readonly
 
-    isDragging.value = true
-    while (!target.classList.contains('draggable-record')) {
-      target = target.parentElement as HTMLElement
-    }
+  if (canDrag) {
+    // We use a timeout to determine if the user is dragging or clicking on the record
+    dragTimeout.value = setTimeout(() => {
+      isDragging.value = true
+      while (!target.classList.contains('draggable-record')) {
+        target = target.parentElement as HTMLElement
+      }
 
-    dragRecord.value = record
-    dragElement.value = target
+      dragRecord.value = record
+      dragElement.value = target
 
-    document.addEventListener('mousemove', onDrag)
-    document.addEventListener('mouseup', stopDrag)
-  }, 200)
+      document.addEventListener('mousemove', onDrag)
+      document.addEventListener('mouseup', stopDrag)
+    }, 200)
+  }
 
   const onMouseUp = () => {
     clearTimeout(dragTimeout.value!)
