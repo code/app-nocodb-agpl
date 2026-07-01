@@ -569,7 +569,7 @@ const stopDrag = (event: MouseEvent) => {
 }
 
 const dragStart = (event: MouseEvent, record: Row) => {
-  if (resizeInProgress.value || isSyncedFromColumn.value) return
+  if (resizeInProgress.value) return
   let target = event.target as HTMLElement
 
   isDragging.value = false
@@ -579,27 +579,33 @@ const dragStart = (event: MouseEvent, record: Row) => {
     y: event.clientY - target.getBoundingClientRect().top,
   }
 
-  dragTimeout.value = setTimeout(() => {
-    if (!isUIAllowed('dataEdit')) return
-    isDragging.value = true
-    while (!target.classList.contains('draggable-record')) {
-      target = target.parentElement as HTMLElement
-    }
+  // Drag-to-reschedule is gated to editable, non-synced ranges; click-to-expand
+  // (onMouseUp below) must work regardless so synced records can be opened.
+  const canDrag =
+    isUIAllowed('dataEdit') && !isSyncedFromColumn.value && !record.rowMeta.range?.is_readonly
 
-    const allRecords = document.querySelectorAll('.draggable-record')
-    allRecords.forEach((el) => {
-      if (!el.getAttribute('data-unique-id').includes(record.rowMeta.id!)) {
-        el.style.opacity = '30%'
+  if (canDrag) {
+    dragTimeout.value = setTimeout(() => {
+      isDragging.value = true
+      while (!target.classList.contains('draggable-record')) {
+        target = target.parentElement as HTMLElement
       }
-    })
 
-    isDragging.value = true
-    dragElement.value = target
-    dragRecord.value = record
+      const allRecords = document.querySelectorAll('.draggable-record')
+      allRecords.forEach((el) => {
+        if (!el.getAttribute('data-unique-id').includes(record.rowMeta.id!)) {
+          el.style.opacity = '30%'
+        }
+      })
 
-    document.addEventListener('mousemove', onDrag)
-    document.addEventListener('mouseup', stopDrag)
-  }, 200)
+      isDragging.value = true
+      dragElement.value = target
+      dragRecord.value = record
+
+      document.addEventListener('mousemove', onDrag)
+      document.addEventListener('mouseup', stopDrag)
+    }, 200)
+  }
 
   const onMouseUp = () => {
     clearTimeout(dragTimeout.value!)

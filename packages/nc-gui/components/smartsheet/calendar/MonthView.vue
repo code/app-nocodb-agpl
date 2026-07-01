@@ -298,7 +298,16 @@ const recordsToDisplay = computed<{
 
         const aSpan = aStart && aEnd ? aEnd.diff(aStart) : 0
         const bSpan = bStart && bEnd ? bEnd.diff(bStart) : 0
-        return bSpan - aSpan
+
+        // Multi-day (spanning) events are laid out first, longest first, so they
+        // occupy continuous lanes across day cells. Events that start and end on
+        // the same day are then ordered by start time within their day.
+        const aMultiDay = !!(aStart && aEnd) && !aEnd.isSame(aStart, 'day')
+        const bMultiDay = !!(bStart && bEnd) && !bEnd.isSame(bStart, 'day')
+        if (aMultiDay !== bMultiDay) return aMultiDay ? -1 : 1
+        if (aMultiDay && bMultiDay) return bSpan - aSpan
+        if (aStart && bStart) return aStart.diff(bStart)
+        return 0
       })
 
     sortedFormattedData.forEach((record: Row) => {
@@ -833,37 +842,38 @@ const stopDrag = (event: MouseEvent) => {
 }
 
 const dragStart = (event: MouseEvent, record: Row) => {
-  if (resizeInProgress.value || !record.rowMeta.id || isSyncedFromColumn.value) return
+  if (resizeInProgress.value || !record.rowMeta.id) return
   let target = event.target as HTMLElement
   isDragging.value = false
 
-  dragTimeout.value = setTimeout(() => {
-    if (!isUIAllowed('dataEdit')) return
-    if (record.rowMeta.range?.is_readonly) return
-    isDragging.value = true
+  // Drag-to-reschedule is only available on editable, non-synced, non-readonly
+  // ranges. Click-to-expand (registered via onMouseUp below) must work regardless,
+  // otherwise records on synced tables (readonly date column) can't be opened.
+  const canDrag =
+    isUIAllowed('dataEdit') && !isSyncedFromColumn.value && !record.rowMeta.range?.is_readonly
 
-    while (!target.classList.contains('draggable-record')) {
-      target = target.parentElement as HTMLElement
-    }
+  if (canDrag) {
+    dragTimeout.value = setTimeout(() => {
+      isDragging.value = true
 
-    // TODO: @DarkPhoenix2704
-    // const initialDragElement = document.querySelector(`[data-unique-id="${record.rowMeta.id}-0"]`)
+      while (!target.classList.contains('draggable-record')) {
+        target = target.parentElement as HTMLElement
+      }
 
-    // selectedDate.value = null
+      isDragging.value = true
+      dragElement.value = target
+      draggingId.value = record.rowMeta!.id!
+      dragRecord.value = record
 
-    isDragging.value = true
-    dragElement.value = target
-    draggingId.value = record.rowMeta!.id!
-    dragRecord.value = record
+      dragOffset.value = {
+        x: dragRecord.value?.rowMeta.maxSpanning > 1 ? event.clientX - target.getBoundingClientRect().left : 0,
+        y: event.clientY,
+      }
 
-    dragOffset.value = {
-      x: dragRecord.value?.rowMeta.maxSpanning > 1 ? event.clientX - target.getBoundingClientRect().left : 0,
-      y: event.clientY,
-    }
-
-    document.addEventListener('mousemove', onDrag)
-    document.addEventListener('mouseup', stopDrag)
-  }, 500)
+      document.addEventListener('mousemove', onDrag)
+      document.addEventListener('mouseup', stopDrag)
+    }, 500)
+  }
 
   const onMouseUp = () => {
     clearTimeout(dragTimeout.value)

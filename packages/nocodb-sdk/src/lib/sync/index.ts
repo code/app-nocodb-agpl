@@ -23,6 +23,7 @@ export enum SyncCategory {
   HRIS = 'hris',
   CRM = 'crm',
   FILE_STORAGE = 'file_storage',
+  CALENDAR = 'calendar',
   CUSTOM = 'custom',
 }
 
@@ -168,6 +169,12 @@ export const SyncCategoryMeta = {
     description: 'Sync files, folders, and metadata.',
     icon: 'ncFolder',
   },
+  [SyncCategory.CALENDAR]: {
+    value: SyncCategory.CALENDAR,
+    label: 'Calendar',
+    description: 'Sync calendar events.',
+    icon: 'ncCalendar',
+  },
   [SyncCategory.CUSTOM]: {
     value: SyncCategory.CUSTOM,
     label: 'Custom',
@@ -202,6 +209,8 @@ export enum TARGET_TABLES {
 
   FILE_STORAGE_FILE = 'fs_file',
   FILE_STORAGE_FOLDER = 'fs_folder',
+
+  CALENDAR_EVENT = 'calendar_event',
 
   CRM_ACCOUNT = 'crm_account',
   // CRM_ASSOCIATION = 'crm_association',
@@ -275,6 +284,14 @@ export const TARGET_TABLES_META = {
     label: 'FS_Folder',
     description: 'Represents file storage folder metadata.',
     required: false,
+  },
+  [TARGET_TABLES.CALENDAR_EVENT]: {
+    category: SyncCategory.CALENDAR,
+    value: TARGET_TABLES.CALENDAR_EVENT,
+    icon: 'ncCalendar',
+    label: 'Event',
+    description: 'Represents calendar events.',
+    required: true,
   },
   // [TARGET_TABLES.HRIS_BANK_INFO]: {
   //   category: SyncCategory.HRIS,
