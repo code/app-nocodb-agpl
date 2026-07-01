@@ -374,6 +374,17 @@ watch(
                       </template> -->
                     </a-input>
                   </template>
+                  <template v-else-if="field.type === FormBuilderInputType.Date">
+                    <a-date-picker
+                      class="!w-full !rounded-lg"
+                      :disabled="disabled"
+                      :value="deepReference(field.model)"
+                      :placeholder="field.placeholder"
+                      format="YYYY-MM-DD"
+                      value-format="YYYY-MM-DD"
+                      @update:value="setFormStateWithEmit(field.model, $event)"
+                    />
+                  </template>
                   <template v-else-if="field.type === FormBuilderInputType.Textarea">
                     <a-textarea
                       class="!w-full !rounded-lg !text-sm !min-h-[90px] max-h-[500px] nc-scrollbar-thin"

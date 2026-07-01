@@ -14,6 +14,7 @@ export { SCHEMA_TICKETING } from './sync/schema-ticketing';
 export { SCHEMA_HRIS } from './sync/schema-hris';
 export { SCHEMA_CRM } from './sync/schema-crm';
 export { SCHEMA_FILE_STORAGE } from './sync/schema-filestorage';
+export { SCHEMA_CALENDAR } from './sync/schema-calendar';
 export type {
   TicketingTicketRecord,
   TicketingUserRecord,
